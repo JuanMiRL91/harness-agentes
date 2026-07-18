@@ -74,8 +74,8 @@ las `done`/`Cancelled` y el id nunca se reutiliza.
    - `.claude/skills/verify/SKILL.md` — `<comando de arranque>` y `<log de la app>`.
    - `harness/docs/` — rellena las plantillas de architecture/data-models y la sección
      de UI de conventions.md.
-3. Crea las carpetas del layout esperado: `core/`, `ui/`, `tests/` (y `docs/IDEAS.md`
-   si usas el cuaderno personal).
+3. Crea las carpetas del layout esperado: `core/`, `ui/`, `tests/`. El cuaderno
+   personal `docs/IDEAS.md` ya viene incluido (borra la idea de ejemplo).
 4. Ejecuta `./harness/init.sh` — debe terminar verde (sin tests aún, avisará con WARN).
 5. Registra la primera tarea con `/add-feature` y trabaja con el ciclo de arriba.
 

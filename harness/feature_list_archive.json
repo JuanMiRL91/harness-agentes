@@ -1,0 +1,17 @@
+{
+  "project": "<nombre-del-proyecto>",
+  "description": "Archivo historico de features cerradas (done/Cancelled), movidas aqui por close.sh. Ids globales con feature_list.json: nunca se reutilizan ni se renumeran.",
+  "rules": {
+    "one_feature_at_a_time": true,
+    "require_tests_to_close": true,
+    "valid_status": [
+      "pending",
+      "in_progress",
+      "done",
+      "blocked",
+      "Postponed",
+      "Cancelled"
+    ]
+  },
+  "features": []
+}

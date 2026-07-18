@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./harness/init.sh)",
+      "Bash(bash harness/init.sh)",
+      "Bash(./harness/close.sh)",
+      "Bash(bash harness/close.sh)",
+      "Bash(python3 -m pytest*)",
+      "Bash(python -m pytest*)",
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git rev-parse*)"
+    ],
+    "deny": [
+      "Edit(docs/IDEAS.md)",
+      "Write(docs/IDEAS.md)",
+      "Edit(harness/progress/history.md)",
+      "Write(harness/progress/history.md)"
+    ]
+  }
+}

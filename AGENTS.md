@@ -1,130 +1,134 @@
-# AGENTS.md — Mapa de navegación para agentes de IA
+# AGENTS.md — Navigation map for AI agents
 
-> Este archivo es el **punto de entrada** para cualquier agente que trabaje en este
-> repositorio. NO es una biblia de reglas: es un **mapa**. Lee solo lo que
-> necesites cuando lo necesites (divulgación progresiva).
+> This file is the **entry point** for any agent working in this repository. It is
+> NOT a rulebook bible: it is a **map**. Read only what you need when you need it
+> (progressive disclosure).
 
 ---
 
-## 1. Antes de empezar (obligatorio)
+## 1. Before starting (mandatory)
 
-1. Ejecuta `./harness/init.sh` y verifica que termina sin errores. Si falla, **para**
-   y resuelve el entorno antes de tocar código.
-2. Lee `harness/progress/current.md` para entender en qué estado quedó la última sesión.
-3. Lee `harness/feature_list.json` y elige **una** tarea con estado `pending`. No
-   trabajes en más de una a la vez. **Los bugs van primero**: si hay alguna
-   tarea `pending` cuyo `name` empieza por `BUG_`, atáchala antes que cualquier
-   feature (ver §4 para el criterio exacto).
+1. Run `./harness/init.sh` and verify it finishes without errors. If it fails,
+   **stop** and fix the environment before touching code.
+2. Read `harness/progress/current.md` to understand the state the last session
+   ended in.
+3. Read `harness/feature_list.json` and pick **one** task with `pending` status. Do
+   not work on more than one at a time. **Bugs go first**: if there is any `pending`
+   task whose `name` starts with `BUG_`, take it before any feature (see §4 for the
+   exact criterion).
 
-## 2. Mapa del repositorio
+## 2. Repository map
 
-| Archivo / carpeta              | Qué contiene                                                        | Cuándo leerlo          |
+| File / folder                  | What it contains                                                    | When to read it        |
 |--------------------------------|---------------------------------------------------------------------|------------------------|
-| `harness/feature_list.json`    | Backlog ACTIVO (pending / in_progress / blocked); las done/Cancelled se archivan en `feature_list_archive.json` (ids globales) | Siempre, al empezar    |
-| `harness/progress/current.md`  | Estado de la sesión actual                                          | Siempre, al empezar    |
-| `harness/progress/history.md`  | Bitácora append-only de sesiones anteriores                         | Si necesitas contexto histórico |
-| `harness/docs/architecture.md` | Decisiones de diseño y mapa de módulos función a función (detalle fino) | Antes de implementar   |
-| `harness/docs/data-models.md`  | Esquema completo de los ficheros de datos                           | Antes de tocar datos   |
-| `harness/docs/conventions.md`  | Reglas de estilo, nombres, estructura                               | Antes de escribir código |
-| `harness/docs/verification.md` | Cómo verificar que tu trabajo funciona                              | Antes de declarar `done` |
-| `harness/CHECKPOINTS.md`       | Criterios objetivos de "estado final correcto"                      | Para auto-evaluarte    |
-| `CLAUDE.md`                    | Contexto mínimo del proyecto (decisiones, rutas, mapa de una línea) | Al inicio de sesión    |
-| `core/`                        | Núcleo Python (lógica de negocio, independiente de la UI)           | Para implementar       |
-| `ui/`                          | UI (sin lógica de negocio; llama a `core/`)                         | Para UI                |
-| `harness/`                     | Herramientas de desarrollo: init.sh, close.sh, check_*.py, viewer.py | Para el harness       |
-| `tests/`                       | Tests automáticos                                                   | Para verificar         |
-| `docs/IDEAS.md`                | Cuaderno **personal del usuario** (ideas futuras) — **NUNCA editarlo** | Solo si el usuario pide analizarlo |
+| `harness/feature_list.json`    | ACTIVE backlog (pending / in_progress / blocked); done/Cancelled are archived in `feature_list_archive.json` (global ids) | Always, when starting  |
+| `harness/progress/current.md`  | Current session state                                               | Always, when starting  |
+| `harness/progress/history.md`  | Append-only log of previous sessions                                | If you need historical context |
+| `harness/docs/architecture.md` | Design decisions and function-by-function module map (fine detail)  | Before implementing    |
+| `harness/docs/data-models.md`  | Complete schema of the data files                                   | Before touching data   |
+| `harness/docs/conventions.md`  | Style, naming and structure rules                                   | Before writing code    |
+| `harness/docs/verification.md` | How to verify that your work functions                              | Before declaring `done` |
+| `harness/CHECKPOINTS.md`       | Objective criteria for a "correct final state"                      | To self-evaluate       |
+| `CLAUDE.md`                    | Minimal project context (decisions, paths, one-line map)            | At session start       |
+| `core/`                        | Python core (business logic, independent of the UI)                 | To implement           |
+| `ui/`                          | UI (no business logic; calls `core/`)                               | For UI work            |
+| `harness/`                     | Development tools: init.sh, close.sh, check_*.py, viewer.py         | For the harness        |
+| `tests/`                       | Automated tests                                                     | To verify              |
+| `docs/IDEAS.md`                | The user's **personal** notebook (future ideas) — **NEVER edit it** | Only if the user asks to analyze it |
 
-## 3. Reglas duras (no negociables)
+## 3. Hard rules (non-negotiable)
 
-- **Una sola feature a la vez.** No mezcles cambios de varias tareas en la misma sesión.
-- **No declares una tarea `done` sin pruebas verdes.** Ejecuta `./harness/init.sh` y
-  asegúrate de que el bloque de tests pasa al 100%.
-- **Documenta lo que haces** en `harness/progress/current.md` mientras trabajas, no al final.
-- **Actualiza la documentación afectada en la misma sesión** — cada cosa va a su documento,
-  sin duplicar: detalle de módulos/funciones/decisiones → `harness/docs/architecture.md`;
-  cambios de esquema de datos → `harness/docs/data-models.md`; changelog →
-  `harness/progress/current.md` (lo archiva `close.sh` en `history.md`); `CLAUDE.md` SOLO
-  si cambia el mapa de una línea o una decisión de arquitectura (mantenerlo <40k
-  caracteres); `README.md` solo si cambia la visión de alto nivel. Ver "Mantenimiento de
-  la documentación" en `CLAUDE.md`; `close.sh` lo verifica.
-- **Cierra siempre la sesión con `./harness/close.sh`** — hace el commit automático.
-- **Si no sabes algo, busca en `harness/docs/` o en `CLAUDE.md`** antes de inventarlo.
-- **`docs/IDEAS.md` es intocable:** es el cuaderno personal del usuario. No lo edites, no lo
-  reformatees, no lo "completes". Solo se lee cuando el usuario pida convertir ideas
-  suyas en features de `harness/feature_list.json`.
+- **One feature at a time.** Do not mix changes from several tasks in the same session.
+- **Do not declare a task `done` without green tests.** Run `./harness/init.sh` and
+  make sure the tests block passes 100%.
+- **Document what you do** in `harness/progress/current.md` while you work, not at the end.
+- **Update the affected documentation in the same session** — each thing goes to its
+  document, without duplication: module/function/decision detail →
+  `harness/docs/architecture.md`; data schema changes → `harness/docs/data-models.md`;
+  changelog → `harness/progress/current.md` (archived by `close.sh` into `history.md`);
+  `CLAUDE.md` ONLY if the one-line map or an architecture decision changes (keep it
+  <40k characters); `README.md` only if the high-level picture changes. See
+  "Documentation maintenance" in `CLAUDE.md`; `close.sh` verifies it.
+- **Always close the session with `./harness/close.sh`** — it makes the automatic commit.
+- **If you don't know something, look in `harness/docs/` or `CLAUDE.md`** before
+  inventing it.
+- **`docs/IDEAS.md` is untouchable:** it is the user's personal notebook. Do not edit
+  it, do not reformat it, do not "complete" it. It is only read when the user asks to
+  convert their ideas into `harness/feature_list.json` features.
 
-## 4. Cómo elegir una tarea
+## 4. How to pick a task
 
-**Los bugs tienen prioridad sobre las features.** Un bug es toda tarea cuyo `name`
-empieza por `BUG_`. Entre las `pending`, primero los bugs por menor `id`; si no queda
-ningún bug `pending`, la feature `pending` de menor `id`.
+**Bugs take priority over features.** A bug is any task whose `name` starts with
+`BUG_`. Among the `pending` ones, bugs first by lowest `id`; if no `pending` bug
+remains, the `pending` feature with the lowest `id`.
 
 ```
-1. Abre harness/feature_list.json
-2. Filtra por status == "pending"
-3. Si hay bugs (name empieza por "BUG_"): coge el bug de menor "id"
-   Si no hay bugs pending: coge la feature de menor "id"
-4. Cambia su status a "in_progress" y guarda
-5. Anota en harness/progress/current.md: feature, hora de inicio, plan breve
+1. Open harness/feature_list.json
+2. Filter by status == "pending"
+3. If there are bugs (name starts with "BUG_"): take the bug with the lowest "id"
+   If there are no pending bugs: take the feature with the lowest "id"
+4. Change its status to "in_progress" and save
+5. Note in harness/progress/current.md: feature, start time, brief plan
 ```
 
-La línea "Feature en curso" de `current.md` debe llevar el formato `#N nombre_feature`
-(el `#N` primero) — `close.sh` la parsea para titular la sesión en `history.md`.
+The "Feature in progress" line of `current.md` must follow the format
+`#N feature_name` (the `#N` first) — `close.sh` parses it to title the session in
+`history.md`.
 
-Para elegir de forma determinista:
+To pick deterministically:
 
 ```bash
 python3 -c "
 import json
 fs = [f for f in json.load(open('harness/feature_list.json'))['features'] if f['status']=='pending']
 fs.sort(key=lambda f: (not f['name'].upper().startswith('BUG'), f['id']))
-print('Siguiente:', fs[0]['id'], fs[0]['name'], '·', fs[0]['title']) if fs else print('Nada pending')
+print('Next:', fs[0]['id'], fs[0]['name'], '·', fs[0]['title']) if fs else print('Nothing pending')
 "
 ```
 
-## 5. Cierre de sesión (lifecycle)
+## 5. Session close (lifecycle)
 
-Cuando la feature esté completada:
+When the feature is complete:
 
-1. **Verifica los criterios de `acceptance` uno a uno** con el método que cada uno indica
-   (comando de test, o paso `UI:` con la skill `verify`, que arranca la app real). No
-   marques `done` con criterios sin comprobar. La skill `verify` se ejecuta **una sola
-   vez y solo aquí** (justo antes de `close.sh`), y únicamente si la `description` de la
-   tarea dice `Verificación E2E: sí` (o tiene pasos `UI:` en `acceptance`); si dice
-   `Verificación E2E: no`, sáltala. NUNCA la ejecutes al inicio de sesión ni como parte
-   de `init.sh` — es la skill más cara en tokens del harness.
-2. **Si la tarea era un `BUG_`, cierra también el ciclo sistémico:** pregúntate qué check
-   del harness (`init.sh`, `close.sh`, `check_*.py`, un test) habría detectado este bug
-   antes de llegar al usuario. Si existe uno razonable, añádelo **en la misma sesión**
-   (skill `improve-harness`); si no aplica, anota en `harness/progress/current.md` una
-   línea `Check sistémico: no aplica — <motivo>`. `close.sh` te lo recordará si cierras
-   un fix sin tocar `harness/`.
-3. **Revisión con contexto fresco:** pasa `/code-review` sobre el diff de la sesión antes
-   del commit y aplica (o descarta razonadamente, dejándolo en `current.md`) los hallazgos.
-   Excepción: en una orquestación del backlog (skill `orchestrate-backlog`) la revisión va
-   agrupada al final del lote — el subagente implementer NO la pasa por feature.
-4. Marca `status: "done"` en `harness/feature_list.json`.
-5. Ejecuta `./harness/close.sh` — hace todo lo demás automáticamente:
-   - Verifica que `init.sh` pasa al 100%.
-   - Advierte si ni `harness/docs/architecture.md` ni `harness/docs/data-models.md`
-     fueron tocados habiendo cambios en `core/`/`ui/`, cruza los símbolos públicos del
-     diff contra los docs y la lista de módulos contra el README
-     (`harness/check_docs.py`) y avisa si `CLAUDE.md` supera los 40.000 caracteres.
-   - Si el commit es un `fix`, recuerda el ciclo sistémico bug → check del harness.
-   - Archiva las features `done`/`Cancelled` en `harness/feature_list_archive.json`.
-   - Mueve el resumen de `harness/progress/current.md` al final de `harness/progress/history.md`.
-   - Resetea `harness/progress/current.md` a la plantilla.
-   - Hace el commit con mensaje convencional (`feat(#N)` / `fix(#N)`).
+1. **Verify the `acceptance` criteria one by one** with the method each one states
+   (test command, or `UI:` step with the `verify` skill, which starts the real app).
+   Do not mark `done` with unchecked criteria. The `verify` skill runs **once and only
+   here** (right before `close.sh`), and only if the task's `description` says
+   `E2E verification: yes` (or has `UI:` steps in `acceptance`); if it says
+   `E2E verification: no`, skip it. NEVER run it at session start or as part of
+   `init.sh` — it is the most token-expensive skill in the harness.
+2. **If the task was a `BUG_`, also close the systemic cycle:** ask yourself which
+   harness check (`init.sh`, `close.sh`, `check_*.py`, a test) would have caught this
+   bug before it reached the user. If a reasonable one exists, add it **in the same
+   session** (`improve-harness` skill); if it does not apply, note in
+   `harness/progress/current.md` a line `Systemic check: not applicable — <reason>`.
+   `close.sh` will remind you if you close a fix without touching `harness/`.
+3. **Fresh-context review:** run `/code-review` over the session diff before the
+   commit and apply (or reasonedly discard, leaving it in `current.md`) the findings.
+   Exception: in a backlog orchestration (`orchestrate-backlog` skill) the review is
+   batched at the end of the run — the implementer subagent does NOT run it per feature.
+4. Mark `status: "done"` in `harness/feature_list.json`.
+5. Run `./harness/close.sh` — it does everything else automatically:
+   - Verifies that `init.sh` passes 100%.
+   - Warns if neither `harness/docs/architecture.md` nor `harness/docs/data-models.md`
+     were touched while there are changes in `core/`/`ui/`, cross-checks the public
+     symbols of the diff against the docs and the module list against the README
+     (`harness/check_docs.py`) and warns if `CLAUDE.md` exceeds 40,000 characters.
+   - If the commit is a `fix`, reminds you of the systemic bug → harness check cycle.
+   - Archives `done`/`Cancelled` features into `harness/feature_list_archive.json`.
+   - Moves the `harness/progress/current.md` summary to the end of
+     `harness/progress/history.md`.
+   - Resets `harness/progress/current.md` to the template.
+   - Makes the commit with a conventional message (`feat(#N)` / `fix(#N)`).
 
-   Códigos de salida: `0` = cerrado · `1` = error · `3` = **pausado** (docs pendientes o
-   `CLAUDE.md` >40k) — corrige exactamente lo que indica y re-ejecuta `./harness/close.sh`;
-   nunca intentes eludir el aviso (con stdin no interactivo la pausa es automática).
+   Exit codes: `0` = closed · `1` = error · `3` = **paused** (docs pending or
+   `CLAUDE.md` >40k) — fix exactly what it points out and re-run `./harness/close.sh`;
+   never try to bypass the warning (with non-interactive stdin the pause is automatic).
 
-## 6. Si te bloqueas
+## 6. If you get stuck
 
-- Relee la sección relevante de `harness/docs/` o `CLAUDE.md`.
-- Si la herramienta no hace lo que esperas, **no inventes un workaround**:
-  documenta el bloqueo en `harness/progress/current.md` y para la sesión.
+- Re-read the relevant section of `harness/docs/` or `CLAUDE.md`.
+- If the tool does not do what you expect, **do not invent a workaround**: document
+  the blocker in `harness/progress/current.md` and stop the session.
 
 ---

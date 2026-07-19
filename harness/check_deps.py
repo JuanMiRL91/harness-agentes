@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-harness/check_deps.py — Detecta imports de terceros no declarados en requirements.txt
-y los añade automáticamente con la versión instalada.
+harness/check_deps.py — Detects third-party imports not declared in requirements.txt
+and adds them automatically with the installed version.
 
-También verifica que los paquetes declarados en requirements.txt estén instalados.
-Exit code siempre 0 — emite WARN pero no bloquea el harness.
+It also verifies that the packages declared in requirements.txt are installed.
+Exit code always 0 — it emits WARN but never blocks the harness.
 """
 
 import ast
@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).parent.parent
 SCAN_DIRS = ["core", "ui", "tests", "scripts"]
 
-# import_name → PyPI package name cuando difieren
+# import_name → PyPI package name when they differ
 IMPORT_TO_PKG = {
     "dotenv":      "python-dotenv",
     "PIL":         "Pillow",
@@ -29,7 +29,7 @@ IMPORT_TO_PKG = {
     "pkg_resources": "setuptools",
 }
 
-# Imports internos que nunca deben buscarse como paquete
+# Internal imports that must never be looked up as a package
 _SKIP = {"__future__", ""}
 
 GREEN  = "\033[0;32m"
@@ -40,12 +40,12 @@ ok   = lambda m: print(f"{GREEN}[OK]{NC}   {m}")
 warn = lambda m: print(f"{YELLOW}[WARN]{NC} {m}")
 
 
-# ── Utilidades ────────────────────────────────────────────────────────────────
+# ── Utilities ────────────────────────────────────────────────────────────────
 
 def _stdlib_names():
     if hasattr(sys, "stdlib_module_names"):           # Python 3.10+
         return sys.stdlib_module_names
-    # Fallback Python 3.9 — lista comprehensiva
+    # Python 3.9 fallback — comprehensive list
     return {
         "abc", "ast", "asyncio", "builtins", "cmath", "cmd", "code",
         "collections", "concurrent", "contextlib", "copy", "csv",
@@ -79,8 +79,8 @@ def _stdlib_names():
 
 
 def _local_packages():
-    # "harness" no esta en SCAN_DIRS (no se escanea) pero SI es un paquete local:
-    # los tests importan harness.check_docs y no debe acabar en requirements.txt
+    # "harness" is not in SCAN_DIRS (not scanned) but it IS a local package:
+    # tests import harness.check_docs and it must not end up in requirements.txt
     local = set(SCAN_DIRS) | {"harness"}
     for f in ROOT.glob("*.py"):
         local.add(f.stem)
@@ -88,7 +88,7 @@ def _local_packages():
 
 
 def _extract_imports(path):
-    """Devuelve el conjunto de nombres de módulo de nivel superior importados en un .py."""
+    """Returns the set of top-level module names imported in a .py file."""
     try:
         tree = ast.parse(path.read_text(encoding="utf-8", errors="ignore"))
     except SyntaxError:
@@ -104,7 +104,7 @@ def _extract_imports(path):
 
 
 def _parse_requirements():
-    """Devuelve {nombre_normalizado: línea_original} de requirements.txt."""
+    """Returns {normalized_name: original_line} from requirements.txt."""
     req_file = ROOT / "requirements.txt"
     if not req_file.exists():
         return {}
@@ -120,12 +120,12 @@ def _parse_requirements():
 
 
 def _norm(name):
-    """Normaliza nombre de paquete: minúsculas, guiones = guiones bajos."""
+    """Normalizes a package name: lowercase, hyphens = underscores."""
     return name.lower().replace("-", "_")
 
 
 def _packages_distributions():
-    """Devuelve {nombre_módulo: [nombre_paquete]} para los paquetes instalados."""
+    """Returns {module_name: [package_name]} for the installed packages."""
     try:
         return importlib.metadata.packages_distributions()      # Python 3.11+
     except AttributeError:
@@ -143,15 +143,15 @@ def _packages_distributions():
 
 def _pkg_for_import(imp, pkg_dist):
     """
-    Devuelve el nombre PyPI del paquete que provee `imp`.
-    Orden: mapeo manual → pkg_dist → asume nombre == import (funciona para
-    plotly, pandas, streamlit, yfinance, openpyxl, requests, pytest…).
+    Returns the PyPI name of the package that provides `imp`.
+    Order: manual mapping → pkg_dist → assume name == import (works for
+    plotly, pandas, streamlit, requests, pytest…).
     """
     if imp in IMPORT_TO_PKG:
         return IMPORT_TO_PKG[imp]
     if imp in pkg_dist:
         return pkg_dist[imp][0]
-    # Último recurso: muchos paquetes tienen import_name == package_name
+    # Last resort: many packages have import_name == package_name
     return imp
 
 
@@ -162,7 +162,7 @@ def _installed_version(pkg_name):
         return None
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# ── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
     stdlib     = _stdlib_names()
@@ -170,7 +170,7 @@ def main():
     reqs       = _parse_requirements()
     pkg_dist   = _packages_distributions()
 
-    # 1. Recopilar todos los imports del proyecto
+    # 1. Collect all the project's imports
     all_imports = set()
     for scan_dir in SCAN_DIRS:
         d = ROOT / scan_dir
@@ -178,17 +178,17 @@ def main():
             for f in d.rglob("*.py"):
                 all_imports.update(_extract_imports(f))
 
-    # 2. Filtrar: solo terceros (no stdlib, no locales, no internos)
+    # 2. Filter: third-party only (no stdlib, no local, no internal)
     third_party = all_imports - stdlib - local - _SKIP
 
-    # 3. Detectar los que no están en requirements.txt
+    # 3. Detect the ones missing from requirements.txt
     missing = []
     for imp in sorted(third_party):
         pkg = _pkg_for_import(imp, pkg_dist)
         if _norm(pkg) not in reqs:
             missing.append((imp, pkg))
 
-    # 4. Añadir los que faltan a requirements.txt
+    # 4. Add the missing ones to requirements.txt
     if missing:
         req_file = ROOT / "requirements.txt"
         content  = req_file.read_text(encoding="utf-8") if req_file.exists() else ""
@@ -206,12 +206,12 @@ def main():
             added.append((imp, pkg, line))
         req_file.write_text(content, encoding="utf-8")
         for imp, pkg, line in added:
-            warn(f"Añadido a requirements.txt: {line}  (import '{imp}')")
-        warn("Revisa las versiones añadidas y ejecuta: pip install -r requirements.txt")
+            warn(f"Added to requirements.txt: {line}  (import '{imp}')")
+        warn("Review the added versions and run: pip install -r requirements.txt")
     else:
-        ok("requirements.txt cubre todas las dependencias detectadas")
+        ok("requirements.txt covers all detected dependencies")
 
-    # 5. Verificar que lo declarado en requirements.txt esté instalado
+    # 5. Verify that what requirements.txt declares is installed
     not_installed = []
     for norm_name, orig_line in reqs.items():
         orig_pkg = re.split(r"[>=<!;#\[ \t]", orig_line)[0].strip()
@@ -219,10 +219,10 @@ def main():
             not_installed.append(orig_pkg)
 
     if not_installed:
-        warn(f"No instalados: {', '.join(not_installed)}")
-        warn("Ejecuta: pip install -r requirements.txt")
+        warn(f"Not installed: {', '.join(not_installed)}")
+        warn("Run: pip install -r requirements.txt")
     elif not missing:
-        ok("Todos los paquetes de requirements.txt están instalados")
+        ok("All requirements.txt packages are installed")
 
     return 0
 

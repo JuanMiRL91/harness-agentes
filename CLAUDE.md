@@ -1,123 +1,123 @@
-# <nombre-del-proyecto> — contexto del proyecto
+# <project-name> — project context
 
-> **Plantilla** — sustituye los `<placeholders>` al adoptar el harness. Este fichero se
-> inyecta entero en cada sesión: se mantiene mínimo (**<40.000 caracteres siempre**,
-> `close.sh` avisa si se supera). El detalle vive en `harness/docs/`.
+> **Template** — replace the `<placeholders>` when adopting the harness. This file is
+> injected whole into every session: keep it minimal (**<40,000 characters always**,
+> `close.sh` warns if exceeded). The detail lives in `harness/docs/`.
 
-<Una o dos líneas: qué es el proyecto, para quién, con qué stack.>
+<One or two lines: what the project is, for whom, with which stack.>
 
-**Dónde está el detalle (no duplicarlo aquí):**
+**Where the detail lives (do not duplicate it here):**
 
-- `harness/docs/architecture.md` — decisiones cerradas y mapa de módulos función a función.
-- `harness/docs/data-models.md` — esquema completo de los ficheros de datos.
-- `harness/progress/history.md` + `harness/feature_list.json` — changelog por sesión/feature.
+- `harness/docs/architecture.md` — closed decisions and function-by-function module map.
+- `harness/docs/data-models.md` — complete schema of the data files.
+- `harness/progress/history.md` + `harness/feature_list.json` — changelog per session/feature.
 
-## Decisiones de arquitectura (cerradas)
+## Architecture decisions (closed)
 
-- **Stack:** <núcleo en `core/` (independiente de la UI) + UI en `ui/`>.
-- <Decisión cerrada 2: persistencia, fuentes de datos, alcance…>
+- **Stack:** <core in `core/` (independent of the UI) + UI in `ui/`>.
+- <Closed decision 2: persistence, data sources, scope…>
 
-## Rutas
+## Paths
 
-- <Rutas y estructura de carpetas relevantes del proyecto.>
-- `docs/IDEAS.md` — cuaderno personal del usuario, NO accionable, ningún agente lo edita.
+- <Relevant paths and folder structure of the project.>
+- `docs/IDEAS.md` — the user's personal notebook, NOT actionable, no agent edits it.
 
-## Mapa de módulos (una línea; detalle en `harness/docs/architecture.md`)
+## Module map (one line each; detail in `harness/docs/architecture.md`)
 
-- `core/<modulo>.py` — <una línea>.
-- `ui/<pagina>.py` — <una línea>.
+- `core/<module>.py` — <one line>.
+- `ui/<page>.py` — <one line>.
 
-## Harness de desarrollo
+## Development harness
 
-- `harness/init.sh` — verifica entorno antes de trabajar (Python, ficheros, deps, tests,
-  contratos UI↔core).
-- `harness/close.sh` — cierre de sesión: init.sh + checks de docs (`check_docs.py` +
-  límite de 40k chars de este fichero) + ciclo sistémico bug→check + archivado de
-  features cerradas → `feature_list_archive.json` + archivado `current.md`→`history.md`
-  + commit convencional automático. Exit 3 = pausado (corregir docs y re-ejecutar).
+- `harness/init.sh` — verifies the environment before working (Python, files, deps,
+  tests, UI↔core contracts).
+- `harness/close.sh` — session close: init.sh + docs checks (`check_docs.py` +
+  40k-char limit of this file) + systemic bug→check cycle + archiving of closed
+  features → `feature_list_archive.json` + archiving `current.md`→`history.md`
+  + automatic conventional commit. Exit 3 = paused (fix the docs and re-run).
 - `harness/check_contracts.py` / `check_docs.py` / `check_deps.py` /
-  `check_placeholder.py` — checks deterministas.
-- `harness/feature_list.json` — backlog accionable ACTIVO (gestionar SOLO con
-  `/add-feature` y `/add-bug`); las cerradas (done/Cancelled) van a
-  `harness/feature_list_archive.json` (ids globales, lo mantiene `close.sh`).
-- `harness/viewer.py` — visor Streamlit (features activo+archivo, historial).
-- `.claude/skills/verify/` — verificación E2E de la app real; se ejecuta SOLO justo antes
-  de `close.sh` si la tarea declara `Verificación E2E: sí`, o por petición explícita del
-  usuario — nunca en el init (ver `AGENTS.md` §5 y `harness/docs/verification.md`).
-- `.claude/skills/orchestrate-backlog/` — vaciar el backlog con subagentes `implementer`
-  secuenciales (haiku/sonnet, escalado a opus en el 2º reintento), code-review + verify
-  E2E agrupados en una pasada final y reanudación tras un corte de sesión (estado
-  persistente en `harness/progress/orchestrator.md`).
-- `.claude/agents/implementer.md` — subagente nativo con el protocolo de implementación
-  de UNA tarea del backlog (el prompt del orquestador solo lleva el JSON de la tarea).
-- `.claude/settings.json` — permisos versionados: allow de comandos del harness, deny de
-  escritura en `docs/IDEAS.md` y `progress/history.md`.
+  `check_placeholder.py` — deterministic checks.
+- `harness/feature_list.json` — ACTIVE actionable backlog (manage ONLY with
+  `/add-feature` and `/add-bug`); closed tasks (done/Cancelled) go to
+  `harness/feature_list_archive.json` (global ids, maintained by `close.sh`).
+- `harness/viewer.py` — Streamlit viewer (active+archived features, session log).
+- `.claude/skills/verify/` — E2E verification of the real app; runs ONLY right before
+  `close.sh` if the task declares `E2E verification: yes`, or on explicit user
+  request — never in the init (see `AGENTS.md` §5 and `harness/docs/verification.md`).
+- `.claude/skills/orchestrate-backlog/` — drain the backlog with sequential
+  `implementer` subagents (haiku/sonnet, escalating to opus on the 2nd retry),
+  code-review + E2E verify batched into one final pass and resumption after a session
+  cut (persistent state in `harness/progress/orchestrator.md`).
+- `.claude/agents/implementer.md` — native subagent with the implementation protocol
+  for ONE backlog task (the orchestrator's prompt only carries the task's JSON).
+- `.claude/settings.json` — versioned permissions: allow for harness commands, deny
+  for writes to `docs/IDEAS.md` and `progress/history.md`.
 - `harness/docs/` — architecture.md, data-models.md, conventions.md, verification.md.
-- `harness/progress/` — `current.md` (sesión activa) + `history.md` (bitácora histórica).
+- `harness/progress/` — `current.md` (active session) + `history.md` (historical log).
 
-## Optimización de tokens y modelos (orquestación)
+## Token and model optimization (orchestration)
 
-Al orquestar trabajo con subagentes, minimizar consumo de tokens y delegar en modelos
-más baratos/rápidos (p. ej. Haiku o Sonnet) siempre que la tarea lo permita:
+When orchestrating work with subagents, minimize token consumption and delegate to
+cheaper/faster models (e.g. Haiku or Sonnet) whenever the task allows:
 
-- **Dividir pesado vs. ligero:** trocear features en tareas pequeñas y aisladas. Reservar
-  el modelo frontier para decisiones de arquitectura, lógica compleja y debugging de
-  fondo; delegar boilerplate, tests unitarios y refactors repetitivos a modelos menores
-  con sub-prompts explícitos e hiperenfocados.
-- **Contexto mínimo:** no pasar estructuras multi-fichero enteras a un subagente; solo la
-  función/clase objetivo y sus dependencias directas.
-- **Sub-prompts sin relleno:** los prompts a subagentes exigen salida directa (solo código
-  o JSON/Markdown estricto, sin intros ni explicaciones).
-- **Estado resumido:** antes de un nuevo ciclo de orquestación, condensar el historial en
-  un bloque "State Summary" breve (<200 tokens) en vez de arrastrar el chat crudo.
-- **Solo diffs:** pedir a los subagentes diffs de git o reemplazos de líneas concretas,
-  nunca reescrituras de ficheros completos.
-- **Escalado, no insistencia:** una tarea fallida se reintenta una vez con el mismo
-  modelo (pasándole el error concreto) y una segunda escalando un nivel
-  (haiku→sonnet→opus); si también falla, `blocked` y se sigue con la siguiente.
+- **Split heavy vs. light:** slice features into small, isolated tasks. Reserve the
+  frontier model for architecture decisions, complex logic and deep debugging;
+  delegate boilerplate, unit tests and repetitive refactors to smaller models with
+  explicit, hyper-focused sub-prompts.
+- **Minimal context:** do not pass whole multi-file structures to a subagent; only the
+  target function/class and its direct dependencies.
+- **No-filler sub-prompts:** subagent prompts demand direct output (only code or
+  strict JSON/Markdown, no intros or explanations).
+- **Summarized state:** before a new orchestration cycle, condense the history into a
+  brief "State Summary" block (<200 tokens) instead of dragging the raw chat along.
+- **Diffs only:** ask subagents for git diffs or concrete line replacements, never
+  full-file rewrites.
+- **Escalation, not insistence:** a failed task is retried once with the same model
+  (passing it the concrete error) and a second time escalating one level
+  (haiku→sonnet→opus); if that also fails, `blocked` and move on to the next.
 
-## Backlog e ideas futuras
+## Backlog and future ideas
 
-- `harness/feature_list.json` es el **único backlog accionable** (skills `/add-feature` y
-  `/add-bug`).
-- `docs/IDEAS.md` es el **cuaderno personal del usuario**: **ningún agente lo edita
-  nunca** — ni siquiera para corregir formato. Solo se lee cuando el usuario pida
-  explícitamente convertir ideas en features del backlog.
+- `harness/feature_list.json` is the **only actionable backlog** (skills
+  `/add-feature` and `/add-bug`).
+- `docs/IDEAS.md` is the **user's personal notebook**: **no agent ever edits it** —
+  not even to fix formatting. It is only read when the user explicitly asks to
+  convert ideas into backlog features.
 
-## Mantenimiento de la documentación
+## Documentation maintenance
 
-Cada feature/bug que cambie `core/`, `ui/` o el harness deja la documentación alineada
-**en la misma sesión**, antes de `./harness/close.sh` (que lo verifica). **Cada cosa va a
-su documento — sin duplicar:**
+Every feature/bug that changes `core/`, `ui/` or the harness leaves the documentation
+aligned **in the same session**, before `./harness/close.sh` (which verifies it).
+**Each thing goes to its document — without duplication:**
 
-1. `harness/docs/architecture.md` — el detalle fino de lo implementado: funciones públicas
-   nuevas/renombradas/eliminadas, decisiones de diseño, hallazgos verificados en vivo
-   (APIs, series, comportamientos). Es lo que `check_docs.py` cruza contra el diff.
-2. `harness/docs/data-models.md` — cualquier cambio de esquema en un fichero de datos
-   (clave nueva, renombrada, eliminada o con semántica distinta).
-3. `harness/progress/current.md` → `history.md` — el changelog narrativo de la sesión
-   (lo archiva `close.sh`). NUNCA escribir changelog en `CLAUDE.md` ni en architecture.md.
-4. `CLAUDE.md` (este fichero) — SOLO si cambia el mapa de una línea (módulo/página
-   nuevo/renombrado/eliminado), una decisión de arquitectura o estas reglas. Se mantiene
-   mínimo: **por debajo de 40.000 caracteres siempre** (`close.sh` avisa si se supera).
-5. `README.md` — solo si cambia la visión de alto nivel (estructura, uso, sincronización).
-6. `harness/docs/conventions.md` / `verification.md` — solo si cambia una convención o el
-   modo de verificar.
+1. `harness/docs/architecture.md` — the fine detail of what was implemented: new/
+   renamed/removed public functions, design decisions, findings verified live (APIs,
+   data series, behaviors). This is what `check_docs.py` cross-checks against the diff.
+2. `harness/docs/data-models.md` — any schema change in a data file (new, renamed or
+   removed key, or changed semantics).
+3. `harness/progress/current.md` → `history.md` — the session's narrative changelog
+   (archived by `close.sh`). NEVER write changelog in `CLAUDE.md` or architecture.md.
+4. `CLAUDE.md` (this file) — ONLY if the one-line map changes (new/renamed/removed
+   module or page), an architecture decision, or these rules. Keep it minimal:
+   **below 40,000 characters always** (`close.sh` warns if exceeded).
+5. `README.md` — only if the high-level picture changes (structure, usage, sync).
+6. `harness/docs/conventions.md` / `verification.md` — only if a convention or the
+   verification method changes.
 
-No documentar planes futuros en ningún doc: lo accionable vive en
-`harness/feature_list.json`; las ideas sin madurar, en `docs/IDEAS.md`.
+Do not document future plans in any doc: actionable work lives in
+`harness/feature_list.json`; unripe ideas in `docs/IDEAS.md`.
 
-## Estado
+## Status
 
-<Fase actual del proyecto en 2-4 líneas. El detalle por feature está en
-`harness/progress/history.md` y `harness/feature_list_archive.json`.>
+<Current phase of the project in 2-4 lines. Per-feature detail lives in
+`harness/progress/history.md` and `harness/feature_list_archive.json`.>
 
-## Comandos
+## Commands
 
 ```bash
 pip install -r requirements.txt
-<comando de arranque de la app>
-streamlit run harness/viewer.py    # visor del backlog
-./harness/init.sh                  # verificar entorno antes de trabajar
-./harness/close.sh                 # cerrar sesión y hacer commit
+<app start command>
+streamlit run harness/viewer.py    # backlog viewer
+./harness/init.sh                  # verify the environment before working
+./harness/close.sh                 # close the session and commit
 ```

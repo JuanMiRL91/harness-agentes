@@ -1,67 +1,67 @@
-# Verificación — cómo saber que tu trabajo funciona
+# Verification — how to know your work functions
 
-## Antes de declarar una feature como `done`
+## Before declaring a feature `done`
 
-1. **Ejecuta `./harness/init.sh`** — debe terminar sin errores (`[OK]` en todos los checks,
-   incluyendo el check de **Contratos UI↔core**).
-2. **Tests verdes:** todos los tests del módulo afectado pasan.
+1. **Run `./harness/init.sh`** — it must finish without errors (`[OK]` on every check,
+   including the **UI↔core contracts** check).
+2. **Green tests:** all tests of the affected module pass.
    ```bash
    python -m pytest tests/ -v
    ```
-3. **Verificación E2E de la UI (skill `verify`):** si la `description` de la tarea dice
-   `Verificación E2E: sí` (o, si no dice nada, cuando el cambio toca `core/` o `ui/`),
-   ejecuta la skill `verify` (`.claude/skills/verify/SKILL.md`): arranca la app real,
-   recorre las páginas afectadas interactuando con el flujo cambiado, y comprueba que no
-   hay errores nuevos en el log de la app ni en la terminal. Los tests no sustituyen este
-   paso. Se ejecuta **solo aquí** (una vez, justo antes de `close.sh`) o cuando el usuario
-   pida verificar explícitamente — nunca al inicio de sesión ni en `init.sh`. Si la tarea
-   dice `Verificación E2E: no`, este paso se salta.
-4. **Criterios de `acceptance` uno a uno:** cada criterio de la tarea en
-   `harness/feature_list.json` indica su método de comprobación (comando de test o paso
-   `UI:`); verifícalos todos antes de marcar `done`.
-5. **Sin residuos:** no hay `print()` de debug, TODOs sin contexto, ni archivos temporales.
+3. **E2E verification of the UI (`verify` skill):** if the task's `description` says
+   `E2E verification: yes` (or, if it says nothing, when the change touches `core/` or
+   `ui/`), run the `verify` skill (`.claude/skills/verify/SKILL.md`): it starts the
+   real app, walks the affected pages interacting with the changed flow, and checks
+   that there are no new errors in the app log or the terminal. Tests do not replace
+   this step. It runs **only here** (once, right before `close.sh`) or when the user
+   explicitly asks to verify — never at session start or in `init.sh`. If the task
+   says `E2E verification: no`, skip this step.
+4. **`acceptance` criteria one by one:** each criterion of the task in
+   `harness/feature_list.json` states its verification method (test command or `UI:`
+   step); verify them all before marking `done`.
+5. **No residue:** no debug `print()`, context-less TODOs, or temporary files.
 
-## Pruebas por capa
+## Tests per layer
 
 ### core/
-- `python -m pytest tests/test_<módulo>.py -v`
-- Para módulos con I/O, usa directorios temporales reales.
-- Para clientes de APIs externas, mockea las llamadas HTTP con `unittest.mock`.
+- `python -m pytest tests/test_<module>.py -v`
+- For modules with I/O, use real temporary directories.
+- For external API clients, mock the HTTP calls with `unittest.mock`.
 
 ### UI
-- Arranca la app con su comando de entrada (documentado en `conventions.md`).
-- Verifica que las páginas principales cargan sin excepciones en la terminal.
+- Start the app with its entry command (documented in `conventions.md`).
+- Verify that the main pages load without exceptions in the terminal.
 
-## Checks de integridad del harness
+## Harness integrity checks
 
-`./harness/init.sh` verifica automáticamente:
-- Python 3.9+ instalado.
-- Archivos obligatorios presentes (`AGENTS.md`, `harness/feature_list.json`,
+`./harness/init.sh` automatically verifies:
+- Python 3.9+ installed.
+- Mandatory files present (`AGENTS.md`, `harness/feature_list.json`,
   `harness/feature_list_archive.json`, `harness/progress/current.md`, `harness/docs/`).
-- Solo una feature en estado `in_progress` a la vez; el archivo de cerradas solo contiene
-  `done`/`Cancelled` y no hay ids duplicados entre activo y archivo.
-- Tests ejecutados correctamente (en orden alfabético y en orden inverso, para detectar
-  estado compartido entre ficheros de test).
-- **Contratos UI↔core** (`harness/check_contracts.py`): todos los símbolos que `ui/` importa
-  de `core/` existen realmente. Detecta `AttributeError` e `ImportError` en runtime antes
-  de arrancar la app. Si este check falla, la app **no arrancará**.
-- **Texto placeholder** (`harness/check_placeholder.py`): ningún literal de cadena de
-  `core/`/`ui/` contiene texto de relleno de la lista negra.
+- Only one feature in `in_progress` state at a time; the archive of closed tasks only
+  contains `done`/`Cancelled` and there are no ids duplicated between active and archive.
+- Tests executed correctly (in alphabetical order and in reverse order, to detect
+  shared state between test files).
+- **UI↔core contracts** (`harness/check_contracts.py`): every symbol `ui/` imports
+  from `core/` actually exists. Catches runtime `AttributeError` and `ImportError`
+  before the app starts. If this check fails, the app **will not start**.
+- **Placeholder text** (`harness/check_placeholder.py`): no string literal in
+  `core/`/`ui/` contains filler text from the blacklist.
 
-## Cierre de sesión
+## Session close
 
-Cuando la feature esté `done`, ejecuta:
+When the feature is `done`, run:
 ```bash
 ./harness/close.sh
 ```
-El script verifica `init.sh`, detecta si `CLAUDE.md`/`README.md`/
-`harness/docs/architecture.md` necesitan actualización — checks binarios más el cruce
-determinista de `harness/check_docs.py`, que lista los símbolos públicos del diff que
-faltan/sobran en los docs y los módulos de `core/`/`ui/` sin mención en la Estructura
-del `README.md` —, y si el commit es un `fix` recuerda el **ciclo sistémico**: qué check
-del harness habría detectado el bug (añádelo con la skill `improve-harness`, o anota en
-`current.md` por qué no aplica). Después mueve `current.md` a `history.md`, lo resetea y
-hace el commit automático.
+The script verifies `init.sh`, detects whether `CLAUDE.md`/`README.md`/
+`harness/docs/architecture.md` need updating — binary checks plus the deterministic
+cross-check of `harness/check_docs.py`, which lists the public symbols of the diff
+that are missing/leftover in the docs and the `core/`/`ui/` modules with no mention in
+the README's Structure section —, and if the commit is a `fix` it reminds you of the
+**systemic cycle**: which harness check would have caught the bug (add it with the
+`improve-harness` skill, or note in `current.md` why it does not apply). Then it moves
+`current.md` to `history.md`, resets it and makes the automatic commit.
 
-Antes de `close.sh`, pasa `/code-review` sobre el diff de la sesión (revisión con
-contexto fresco) y aplica o descarta razonadamente sus hallazgos (ver `AGENTS.md` §5).
+Before `close.sh`, run `/code-review` over the session diff (fresh-context review) and
+apply or reasonedly discard its findings (see `AGENTS.md` §5).

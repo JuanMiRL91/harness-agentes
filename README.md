@@ -1,108 +1,109 @@
 # harness-agentes
 
-Harness de desarrollo reutilizable para trabajar con agentes de IA (Claude Code) de
-forma **autónoma pero verificable**: backlog en fichero, checks deterministas, cierre de
-sesión con commit automático, y orquestación de subagentes optimizada en tokens.
+Reusable development harness for working with AI agents (Claude Code) in an
+**autonomous but verifiable** way: file-based backlog, deterministic checks, session
+close with automatic commit, and token-optimized subagent orchestration.
 
-Extraído de un proyecto real en uso diario (~190 features cerradas con este flujo).
+Extracted from a real project in daily use (~190 features closed with this workflow).
 
-## Filosofía
+## Philosophy
 
-- **El repositorio es el sistema.** Todo el estado vive en ficheros versionados:
-  backlog (`feature_list.json`), sesión activa (`progress/current.md`), bitácora
-  (`progress/history.md`), documentación técnica (`harness/docs/`). Ninguna base de
-  datos, ningún estado fuera de git.
-- **Verificación real, no impresiones.** `init.sh` ejecuta los tests de verdad (dos
-  veces: orden alfabético e inverso, para cazar estado compartido), valida contratos
-  UI↔core por AST y detecta texto placeholder. `close.sh` no deja cerrar la sesión con
-  docs desalineados.
-- **Divulgación progresiva.** `AGENTS.md` es un mapa, no una biblia: el agente lee cada
-  documento solo cuando lo necesita. `CLAUDE.md` se mantiene <40k caracteres (el
-  harness lo verifica).
-- **Ciclo sistémico bug → check.** Cada bug cerrado obliga a preguntarse qué check del
-  harness lo habría detectado antes, y a añadirlo en la misma sesión.
-- **Tokens como recurso escaso.** El modelo frontier orquesta y decide; los subagentes
-  (Haiku/Sonnet) implementan. Review y verificación E2E van agrupadas al final del
-  lote, no por feature.
+- **The repository is the system.** All state lives in versioned files: backlog
+  (`feature_list.json`), active session (`progress/current.md`), session log
+  (`progress/history.md`), technical documentation (`harness/docs/`). No database,
+  no state outside git.
+- **Real verification, not impressions.** `init.sh` actually runs the tests (twice:
+  alphabetical and reverse order, to catch shared state), validates UI↔core contracts
+  via AST and detects placeholder text. `close.sh` refuses to close a session with
+  misaligned docs.
+- **Progressive disclosure.** `AGENTS.md` is a map, not a bible: the agent reads each
+  document only when it needs it. `CLAUDE.md` stays under 40k characters (the harness
+  verifies it).
+- **Systemic bug → check cycle.** Every closed bug forces the question of which harness
+  check would have caught it earlier, and adds it in the same session.
+- **Tokens as a scarce resource.** The frontier model orchestrates and decides;
+  subagents (Haiku/Sonnet) implement. Review and E2E verification are batched at the
+  end of the run, not per feature.
 
-## Componentes
+## Components
 
-| Componente | Qué hace |
+| Component | What it does |
 |---|---|
-| `AGENTS.md` | Punto de entrada del agente: cómo elegir tarea, reglas duras, lifecycle |
-| `CLAUDE.md` | Contexto mínimo del proyecto (plantilla con placeholders) |
-| `harness/init.sh` | Verificación pre-trabajo: Python, ficheros, backlog, deps, tests, contratos |
-| `harness/close.sh` | Cierre de sesión: checks de docs, archivado, commit convencional automático |
-| `harness/check_contracts.py` | Los imports `ui/ → core/` apuntan a símbolos reales (AST) |
-| `harness/check_docs.py` | Símbolos públicos del diff cruzados contra los docs; módulos contra README |
-| `harness/check_deps.py` | Imports de terceros no declarados → los añade a `requirements.txt` |
-| `harness/check_placeholder.py` | Texto de relleno en literales de `core/`/`ui/` |
-| `harness/feature_list.json` | Backlog activo; las cerradas van a `feature_list_archive.json` (ids globales) |
-| `harness/progress/` | `current.md` (sesión activa) + `history.md` (bitácora append-only) |
+| `AGENTS.md` | Agent entry point: how to pick a task, hard rules, lifecycle |
+| `CLAUDE.md` | Minimal project context (template with placeholders) |
+| `harness/init.sh` | Pre-work verification: Python, files, backlog, deps, tests, contracts |
+| `harness/close.sh` | Session close: docs checks, archiving, automatic conventional commit |
+| `harness/check_contracts.py` | `ui/ → core/` imports point to real symbols (AST) |
+| `harness/check_docs.py` | Public symbols in the diff cross-checked against docs; modules against README |
+| `harness/check_deps.py` | Undeclared third-party imports → added to `requirements.txt` |
+| `harness/check_placeholder.py` | Placeholder text in `core/`/`ui/` string literals |
+| `harness/feature_list.json` | Active backlog; closed tasks go to `feature_list_archive.json` (global ids) |
+| `harness/progress/` | `current.md` (active session) + `history.md` (append-only log) |
 | `harness/docs/` | architecture.md · data-models.md · conventions.md · verification.md |
-| `harness/CHECKPOINTS.md` | Criterios objetivos de "estado final correcto" |
-| `harness/viewer.py` | Visor Streamlit del backlog y el historial |
-| `.claude/skills/add-feature` · `add-bug` | Alta de tareas en el backlog con esquema y validación |
-| `.claude/skills/improve-harness` | Extender el propio harness (mapa interno + convenciones) |
-| `.claude/skills/orchestrate-backlog` | Vaciar el backlog con subagentes secuenciales + review/verify agrupados |
-| `.claude/skills/verify` | Verificación E2E con la app real y navegador (cara: solo al cierre) |
-| `.claude/agents/implementer.md` | Subagente que implementa UNA tarea del backlog |
-| `.claude/settings.json` | Permisos versionados (allow del harness, deny de IDEAS.md/history.md) |
+| `harness/CHECKPOINTS.md` | Objective criteria for a "correct final state" |
+| `harness/viewer.py` | Streamlit viewer for the backlog and the session log |
+| `.claude/skills/add-feature` · `add-bug` | Register tasks in the backlog with schema and validation |
+| `.claude/skills/improve-harness` | Extend the harness itself (internal map + conventions) |
+| `.claude/skills/orchestrate-backlog` | Drain the backlog with sequential subagents + batched review/verify |
+| `.claude/skills/verify` | E2E verification with the real app and a browser (expensive: close-time only) |
+| `.claude/agents/implementer.md` | Subagent that implements ONE backlog task |
+| `.claude/settings.json` | Versioned permissions (allow for the harness, deny for IDEAS.md/history.md) |
 
-## Ciclo de vida de una sesión
+## Session lifecycle
 
 ```
-./harness/init.sh                  # entorno verde antes de tocar nada
-  → elegir UNA tarea pending (bugs BUG_* primero)
-  → implementar + documentar en current.md en tiempo real
-  → verificar acceptance uno a uno (+ skill verify si la tarea lo declara)
-  → /code-review sobre el diff
-  → marcar done
-./harness/close.sh                 # re-verifica, cruza docs, archiva, commit automático
+./harness/init.sh                  # green environment before touching anything
+  → pick ONE pending task (BUG_* bugs first)
+  → implement + document in current.md in real time
+  → verify acceptance criteria one by one (+ verify skill if the task declares it)
+  → /code-review over the diff
+  → mark done
+./harness/close.sh                 # re-verifies, cross-checks docs, archives, automatic commit
 ```
 
-Estados de una tarea: `pending → in_progress → done` (o `blocked`); `close.sh` archiva
-las `done`/`Cancelled` y el id nunca se reutiliza.
+Task states: `pending → in_progress → done` (or `blocked`); `close.sh` archives
+`done`/`Cancelled` tasks and ids are never reused.
 
-## Adoptarlo en un proyecto nuevo
+## Adopting it in a new project
 
-1. Copia el contenido de este repo a la raíz del proyecto (o úsalo como plantilla de
-   GitHub).
-2. Sustituye los `<placeholders>`:
-   - `CLAUDE.md` — nombre, decisiones, rutas, mapa de módulos, comando de arranque.
-   - `harness/feature_list.json` y `feature_list_archive.json` — `project` y `description`.
-   - `.claude/skills/verify/SKILL.md` — `<comando de arranque>` y `<log de la app>`.
-   - `harness/docs/` — rellena las plantillas de architecture/data-models y la sección
-     de UI de conventions.md.
-3. Crea las carpetas del layout esperado: `core/`, `ui/`, `tests/`. El cuaderno
-   personal `docs/IDEAS.md` ya viene incluido (borra la idea de ejemplo).
-4. Ejecuta `./harness/init.sh` — debe terminar verde (sin tests aún, avisará con WARN).
-5. Registra la primera tarea con `/add-feature` y trabaja con el ciclo de arriba.
+1. Copy the contents of this repo to the project root (or use it as a GitHub
+   template).
+2. Replace the `<placeholders>`:
+   - `CLAUDE.md` — name, decisions, paths, module map, app start command.
+   - `harness/feature_list.json` and `feature_list_archive.json` — `project` and `description`.
+   - `.claude/skills/verify/SKILL.md` — `<app start command>` and `<app log file>`.
+   - `harness/docs/` — fill in the architecture/data-models templates and the UI
+     section of conventions.md.
+3. Create the expected layout folders: `core/`, `ui/`, `tests/`. The personal
+   notebook `docs/IDEAS.md` is already included (delete the example idea).
+4. Run `./harness/init.sh` — it must finish green (with no tests yet it will WARN).
+5. Register the first task with `/add-feature` and work with the cycle above.
 
-### Supuestos del harness (adaptar si tu proyecto difiere)
+### Harness assumptions (adapt if your project differs)
 
-- **Layout en capas Python:** `core/` (lógica) + `ui/` (presentación) + `tests/`.
-  Si usas otros nombres, ajusta `SCAN_DIRS`/`UI_DIRS` en los `check_*.py` y las rutas
-  `core/ ui/` en `init.sh`/`close.sh`.
-- **Python ≥3.9**, tests con pytest (fallback unittest), deps en `requirements.txt`.
-- **Idioma:** documentación y UI en español; código y claves en inglés.
-- `check_docs.py` cruza `core/*.py` y `ui/common.py` (la frontera pública de la UI);
-  amplía la lista si tu UI expone más módulos documentables.
-- Los scripts detectan `python3`/`python` y fuerzan UTF-8: funcionan en macOS, Linux y
+- **Layered Python layout:** `core/` (logic) + `ui/` (presentation) + `tests/`.
+  If you use other names, adjust `SCAN_DIRS`/`UI_DIRS` in the `check_*.py` scripts and
+  the `core/ ui/` paths in `init.sh`/`close.sh`.
+- **Python ≥3.9**, tests with pytest (unittest fallback), deps in `requirements.txt`.
+- **Language:** everything in English (docs, UI and code). Adapt to your own language
+  if you prefer — the parsed markers live in `close.sh` and `progress/current.md`.
+- `check_docs.py` cross-checks `core/*.py` and `ui/common.py` (the UI's public
+  boundary); extend the list if your UI exposes more documentable modules.
+- The scripts detect `python3`/`python` and force UTF-8: they work on macOS, Linux and
   Windows Git Bash.
 
-## Créditos
+## Credits
 
-Basado en el patrón de *harness engineering* de
+Based on the *harness engineering* pattern by
 [betta-tech](https://github.com/betta-tech):
-[ejemplo-harness-subagentes](https://github.com/betta-tech/ejemplo-harness-subagentes) y
-[harness-sdd](https://github.com/betta-tech/harness-sdd). La implementación de este
-repo está reescrita y ampliada (cierre con commit automático y checks de documentación,
-archivado del backlog, ciclo sistémico bug→check, orquestación con escalado de modelos
-y verificación E2E agrupada), pero el diseño de partida —AGENTS.md como mapa,
-`feature_list.json` como backlog, `init.sh` como puerta de entrada y `progress/` como
-estado en disco— es suyo.
+[ejemplo-harness-subagentes](https://github.com/betta-tech/ejemplo-harness-subagentes) and
+[harness-sdd](https://github.com/betta-tech/harness-sdd). The implementation in this
+repo is rewritten and extended (close with automatic commit and documentation checks,
+backlog archiving, systemic bug→check cycle, orchestration with model escalation and
+batched E2E verification), but the starting design —AGENTS.md as a map,
+`feature_list.json` as the backlog, `init.sh` as the entry gate and `progress/` as
+on-disk state— is theirs.
 
-## Licencia
+## License
 
 [MIT](LICENSE)

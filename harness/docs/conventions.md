@@ -1,68 +1,72 @@
-# Convenciones de código
+# Code conventions
 
 ## Python
 
-- **Versión:** Python 3.9+
-- **Estilo:** PEP 8, máximo 100 caracteres por línea
-- **Nombres:**
-  - Módulos y funciones: `snake_case`
-  - Clases: `PascalCase`
-  - Constantes: `UPPER_SNAKE`
-  - Privadas: prefijo `_`
-- **Strings:** comillas dobles. Interpolación con f-strings (no `.format()` ni `%`).
-- **Imports:** stdlib → librerías externas → módulos locales. Un grupo por tipo, separados por línea en blanco.
-- **Idioma:** UI y docs en español; código, claves y nombres de fichero en inglés.
+- **Version:** Python 3.9+
+- **Style:** PEP 8, maximum 100 characters per line
+- **Names:**
+  - Modules and functions: `snake_case`
+  - Classes: `PascalCase`
+  - Constants: `UPPER_SNAKE`
+  - Private: `_` prefix
+- **Strings:** double quotes. Interpolation with f-strings (no `.format()` or `%`).
+- **Imports:** stdlib → external libraries → local modules. One group per type,
+  separated by a blank line.
+- **Language:** everything in English — docs, UI texts, code, keys and file names.
 
-## Comentarios
+## Comments
 
-Por defecto **no** se escriben comentarios. Solo se permiten cuando explican el **porqué** (una restricción no obvia, un invariante sutil, un workaround con razón). Los nombres claros comunican el qué.
+By default **no** comments are written. They are only allowed when they explain the
+**why** (a non-obvious constraint, a subtle invariant, a workaround with a reason).
+Clear names communicate the what.
 
-## Módulos `core/`
+## `core/` modules
 
-- Cada módulo tiene una responsabilidad única (ver `harness/docs/architecture.md`).
-- Las funciones que pueden fallar lanzan excepciones con nombre, no devuelven `None`.
-- No hay estado global mutable entre llamadas.
-- `core/` no importa nada de `ui/`: el núcleo es reutilizable sin la UI.
+- Each module has a single responsibility (see `harness/docs/architecture.md`).
+- Functions that can fail raise named exceptions, they do not return `None`.
+- No mutable global state between calls.
+- `core/` imports nothing from `ui/`: the core is reusable without the UI.
 
 ## UI (`ui/`)
 
-- La UI no contiene lógica de negocio. Llama a `core/` para todo cálculo.
-- _Anota aquí el comando de arranque y los requisitos de versión del framework de UI._
+- The UI contains no business logic. It calls `core/` for every computation.
+- _Note here the start command and the UI framework version requirements._
 
 ## Tests (`tests/`)
 
-- Un archivo de test por módulo de `core/`: `tests/test_<módulo>.py`.
-- Usa `unittest.TestCase` con nombres descriptivos.
-- Los tests de I/O usan directorios temporales reales (no mocks del filesystem).
-- Ejecuta con: `python -m pytest tests/` o `python -m unittest discover tests/`.
+- One test file per `core/` module: `tests/test_<module>.py`.
+- Use `unittest.TestCase` with descriptive names.
+- I/O tests use real temporary directories (no filesystem mocks).
+- Run with: `python -m pytest tests/` or `python -m unittest discover tests/`.
 
 ## Harness (`harness/`)
 
-- `init.sh` y `close.sh` se ejecutan desde la raíz del proyecto: `./harness/init.sh`.
-- `check_*.py` y `viewer.py` son herramientas de desarrollo, no de producción.
-- Los scripts del harness no dependen del framework de UI y deben ejecutarse en shell
-  limpio (excepción: `viewer.py`, que usa Streamlit).
+- `init.sh` and `close.sh` run from the project root: `./harness/init.sh`.
+- `check_*.py` and `viewer.py` are development tools, not production code.
+- Harness scripts do not depend on the UI framework and must run in a clean shell
+  (exception: `viewer.py`, which uses Streamlit).
 
-## Documentación
+## Documentation
 
-Cada feature/bug que cambie `core/`, `ui/` o el harness deja la documentación alineada
-**en la misma sesión**, antes de `./harness/close.sh` (que lo verifica). Cada cosa va a
-su documento, **sin duplicar**:
+Every feature/bug that changes `core/`, `ui/` or the harness leaves the documentation
+aligned **in the same session**, before `./harness/close.sh` (which verifies it). Each
+thing goes to its document, **without duplication**:
 
-- `harness/docs/architecture.md` — la fuente de detalle fino: funciones públicas
-  nuevas/renombradas/eliminadas, decisiones de diseño, hallazgos verificados en vivo.
-- `harness/docs/data-models.md` — cualquier cambio de esquema en un fichero de datos
-  (clave nueva, renombrada, eliminada o con semántica distinta).
-- `harness/progress/current.md` — el changelog narrativo de la sesión (`close.sh` lo
-  archiva en `history.md`). Nunca escribir changelog en `CLAUDE.md` ni architecture.md.
-- `CLAUDE.md` — SOLO si cambia el mapa de una línea (módulo/página nuevo/renombrado/
-  eliminado) o una decisión de arquitectura. Se mantiene por debajo de 40.000 caracteres
-  (`close.sh` avisa si se supera).
-- `README.md` — visión de alto nivel; actualizar solo si el cambio afecta a lo que describe.
-- `harness/docs/conventions.md` / `verification.md` — solo si cambia una convención o el
-  modo de verificar.
+- `harness/docs/architecture.md` — the source of fine detail: new/renamed/removed
+  public functions, design decisions, findings verified live.
+- `harness/docs/data-models.md` — any schema change in a data file (new, renamed or
+  removed key, or changed semantics).
+- `harness/progress/current.md` — the session's narrative changelog (`close.sh`
+  archives it into `history.md`). Never write changelog in `CLAUDE.md` or
+  architecture.md.
+- `CLAUDE.md` — ONLY if the one-line map changes (new/renamed/removed module or page)
+  or an architecture decision. It stays below 40,000 characters (`close.sh` warns if
+  exceeded).
+- `README.md` — high-level picture; update only if the change affects what it describes.
+- `harness/docs/conventions.md` / `verification.md` — only if a convention or the
+  verification method changes.
 
-La documentación describe **lo implementado**, nunca planes futuros: lo accionable va a
-`harness/feature_list.json` (skills `/add-feature`, `/add-bug`); las ideas sin madurar van
-a `docs/IDEAS.md`, documento **personal del usuario** que ningún agente edita (solo se lee
-cuando el usuario pida convertir ideas en features).
+Documentation describes **what is implemented**, never future plans: actionable work
+goes to `harness/feature_list.json` (skills `/add-feature`, `/add-bug`); unripe ideas
+go to `docs/IDEAS.md`, a **personal document of the user** that no agent edits (it is
+only read when the user asks to convert ideas into features).

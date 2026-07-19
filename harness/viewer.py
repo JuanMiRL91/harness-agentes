@@ -1,6 +1,6 @@
 """
-Visor del harness (backlog, ideas, historial).
-Ejecutar con: streamlit run harness/viewer.py --server.port 8502
+Harness viewer (backlog, ideas, session history).
+Run with: streamlit run harness/viewer.py --server.port 8502
 """
 
 import hashlib
@@ -31,12 +31,12 @@ DEFAULT_STATUS_HIDDEN = {"done", "blocked", "Postponed", "Cancelled"}
 
 
 def load() -> dict:
-    """Vista única del backlog: fichero activo + archivo de cerradas, ordenada por id."""
+    """Single backlog view: active file + archive of closed tasks, sorted by id."""
     with open(FEATURE_LIST, encoding="utf-8") as f:
         data = json.load(f)
     archive = {
         "project": data.get("project", ""),
-        "description": "Archivo histórico de features cerradas (done/Cancelled).",
+        "description": "Historical archive of closed features (done/Cancelled).",
         "rules": data.get("rules", {}),
         "features": [],
     }
@@ -57,8 +57,8 @@ def _write_json(path: Path, payload: dict) -> None:
 
 
 def save(data: dict) -> None:
-    """Reparte la vista única: done/Cancelled al archivo, el resto al fichero activo
-    (reactivar una feature archivada desde el viewer la devuelve al activo)."""
+    """Splits the single view: done/Cancelled to the archive, the rest to the active
+    file (reactivating an archived feature from the viewer returns it to active)."""
     features = data["features"]
     active = {k: v for k, v in data.items() if k not in ("features", "_archive_meta")}
     active["features"] = [f for f in features if f.get("status", "pending") not in ("done", "Cancelled")]
@@ -69,8 +69,8 @@ def save(data: dict) -> None:
 
 
 def parse_ideas(content: str) -> tuple:
-    """Separa IDEAS.md en cabecera (todo lo anterior al primer '---') y lista de
-    ideas [{'title', 'description'}], una por bloque separado por '---'."""
+    """Splits IDEAS.md into a header (everything before the first '---') and a list
+    of ideas [{'title', 'description'}], one per block separated by '---'."""
     segments = re.split(r"^---\s*$", content, flags=re.MULTILINE)
     header = segments[0].rstrip()
     ideas = []
@@ -88,7 +88,7 @@ def parse_ideas(content: str) -> tuple:
 
 
 def save_ideas(header: str, ideas: list) -> None:
-    """Reescribe IDEAS.md preservando la cabecera tal cual y una idea por bloque."""
+    """Rewrites IDEAS.md preserving the header as-is and one idea per block."""
     blocks = [header.rstrip()]
     for idea in ideas:
         lines = []
@@ -162,32 +162,32 @@ features = data["features"]
 st.title("🗂️ Harness")
 st.caption(data.get("description", ""))
 
-tab_features, tab_history, tab_ideas = st.tabs(["📋 Features", "📖 Historial", "💡 Ideas"])
+tab_features, tab_history, tab_ideas = st.tabs(["📋 Features", "📖 History", "💡 Ideas"])
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB: HISTORIAL
+# TAB: HISTORY
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_history:
-    st.subheader("📖 Historial de sesiones")
+    st.subheader("📖 Session history")
 
     col_cur, col_hist = st.columns([1, 2])
 
     with col_cur:
-        st.markdown("**Sesión actual** (`progress/current.md`)")
+        st.markdown("**Current session** (`progress/current.md`)")
         if CURRENT_MD.exists():
             st.markdown(CURRENT_MD.read_text(encoding="utf-8"))
         else:
-            st.info("progress/current.md no encontrado.")
+            st.info("progress/current.md not found.")
 
     with col_hist:
-        st.markdown("**Bitácora histórica** (`progress/history.md`)")
+        st.markdown("**Historical log** (`progress/history.md`)")
         if HISTORY_MD.exists():
             content = HISTORY_MD.read_text(encoding="utf-8")
-            # Mostrar las entradas más recientes primero (split por "---")
+            # Show the most recent entries first (split by "---")
             entries = [e.strip() for e in content.split("---") if e.strip()]
             for entry in reversed(entries):
                 if entry.startswith("#"):
-                    # Extraer la primera línea como título del expander
+                    # Extract the first line as the expander title
                     lines = entry.splitlines()
                     title = lines[0].lstrip("#").strip()
                     body = "\n".join(lines[1:]).strip()
@@ -196,7 +196,7 @@ with tab_history:
                 else:
                     st.markdown(entry)
         else:
-            st.info("progress/history.md no encontrado.")
+            st.info("progress/history.md not found.")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB: FEATURES
@@ -218,7 +218,7 @@ with tab_features:
         cols[i + 1].metric(cfg["label"], counts.get(status, 0))
 
     progress = done_n / total_w_o_cancelled if total_w_o_cancelled else 0
-    st.progress(progress, text=f"Progreso: {done_n}/{total_w_o_cancelled} completadas ({progress:.0%})")
+    st.progress(progress, text=f"Progress: {done_n}/{total_w_o_cancelled} completed ({progress:.0%})")
 
     st.divider()
 
@@ -228,24 +228,24 @@ with tab_features:
         all_statuses = list(STATUS_CONFIG.keys())
         default_statuses = [e for e in all_statuses if e not in DEFAULT_STATUS_HIDDEN]
         selected_statuses = st.multiselect(
-            "Filtrar por estado",
+            "Filter by status",
             options=all_statuses,
             default=default_statuses,
             format_func=lambda s: STATUS_CONFIG[s]["label"],
         )
     with col_sort:
-        sort_by = st.selectbox("Ordenar por", ["ID", "Estado", "Nombre"])
+        sort_by = st.selectbox("Sort by", ["ID", "Status", "Name"])
 
     visible = [f for f in features if f.get("status") in selected_statuses]
     if sort_by == "ID":
         visible = sorted(visible, key=lambda f: f["id"])
-    elif sort_by == "Estado":
+    elif sort_by == "Status":
         visible = sorted(visible, key=lambda f: STATUS_CONFIG.get(f.get("status", ""), {}).get("order", 99))
     else:
         visible = sorted(visible, key=lambda f: f.get("name", ""))
 
     # ── Feature cards ─────────────────────────────────────────────────────────
-    st.subheader(f"Features ({len(visible)} visibles)")
+    st.subheader(f"Features ({len(visible)} visible)")
 
     for feat in visible:
         status = feat.get("status", "pending")
@@ -282,7 +282,7 @@ with tab_features:
             if options:
                 with action_cols[1]:
                     new_status = st.selectbox(
-                        "Cambiar a",
+                        "Change to",
                         options=["—"] + options,
                         key=f"sel_{feat['id']}",
                         label_visibility="collapsed",
@@ -294,7 +294,7 @@ with tab_features:
 
             st.markdown("---", unsafe_allow_html=False)
 
-    st.caption("Las features nuevas se dan de alta con las skills `/add-feature` y `/add-bug`.")
+    st.caption("New features are registered with the `/add-feature` and `/add-bug` skills.")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB: IDEAS
@@ -303,25 +303,25 @@ with tab_ideas:
     st.subheader("💡 Ideas (`docs/IDEAS.md`)")
 
     if not IDEAS_MD.exists():
-        st.info("docs/IDEAS.md no encontrado en el repo.")
+        st.info("docs/IDEAS.md not found in the repo.")
     else:
         ideas_header, ideas = parse_ideas(IDEAS_MD.read_text(encoding="utf-8"))
         st.caption(
-            f"{len(ideas)} ideas · cuaderno personal: se edita solo desde aquí o a mano, "
-            "nunca por agentes."
+            f"{len(ideas)} ideas · personal notebook: edited only from here or by hand, "
+            "never by agents."
         )
 
-        # ── Añadir idea ───────────────────────────────────────────────────────
+        # ── Add idea ──────────────────────────────────────────────────────────
         with st.form("add_idea", clear_on_submit=True):
-            st.markdown("**➕ Añadir idea**")
-            add_title = st.text_input("Título", placeholder="ej: Gráficos con etiquetas en barras")
+            st.markdown("**➕ Add idea**")
+            add_title = st.text_input("Title", placeholder="e.g.: Charts with bar labels")
             add_desc = st.text_area(
-                "Descripción", height=110,
-                placeholder="Detalle de la idea (opcional).",
+                "Description", height=110,
+                placeholder="Detail of the idea (optional).",
             )
-            if st.form_submit_button("Añadir idea", type="primary"):
+            if st.form_submit_button("Add idea", type="primary"):
                 if not add_title.strip():
-                    st.error("El título es obligatorio.")
+                    st.error("The title is mandatory.")
                 else:
                     ideas.append({"title": add_title.strip(), "description": add_desc.strip()})
                     save_ideas(ideas_header, ideas)
@@ -329,7 +329,7 @@ with tab_ideas:
 
         st.divider()
 
-        # ── Listado + edición ─────────────────────────────────────────────────
+        # ── List + editing ────────────────────────────────────────────────────
         for i, idea in enumerate(ideas):
             idea_key = hashlib.md5(
                 f"{idea['title']}\x00{idea['description']}".encode()
@@ -339,19 +339,19 @@ with tab_ideas:
             )
             with col_top:
                 if st.button(
-                    "⏫", key=f"idea_top_{i}", disabled=(i == 0), help="Subir al principio",
+                    "⏫", key=f"idea_top_{i}", disabled=(i == 0), help="Move to top",
                 ):
                     ideas.insert(0, ideas.pop(i))
                     save_ideas(ideas_header, ideas)
                     st.rerun()
             with col_up:
-                if st.button("▲", key=f"idea_up_{i}", disabled=(i == 0), help="Subir idea"):
+                if st.button("▲", key=f"idea_up_{i}", disabled=(i == 0), help="Move idea up"):
                     ideas[i - 1], ideas[i] = ideas[i], ideas[i - 1]
                     save_ideas(ideas_header, ideas)
                     st.rerun()
             with col_down:
                 if st.button(
-                    "▼", key=f"idea_down_{i}", disabled=(i == len(ideas) - 1), help="Bajar idea",
+                    "▼", key=f"idea_down_{i}", disabled=(i == len(ideas) - 1), help="Move idea down",
                 ):
                     ideas[i + 1], ideas[i] = ideas[i], ideas[i + 1]
                     save_ideas(ideas_header, ideas)
@@ -359,34 +359,34 @@ with tab_ideas:
             with col_bottom:
                 if st.button(
                     "⏬", key=f"idea_bottom_{i}", disabled=(i == len(ideas) - 1),
-                    help="Bajar al final",
+                    help="Move to bottom",
                 ):
                     ideas.append(ideas.pop(i))
                     save_ideas(ideas_header, ideas)
                     st.rerun()
-            with col_expander, st.expander(f"💡 {idea['title'] or '(sin título)'}"):
+            with col_expander, st.expander(f"💡 {idea['title'] or '(untitled)'}"):
                 if idea["description"]:
                     st.markdown(idea["description"])
                     st.markdown("---")
                 with st.form(f"edit_idea_{idea_key}"):
                     edit_title = st.text_input(
-                        "Título", value=idea["title"], key=f"idea_t_{idea_key}",
+                        "Title", value=idea["title"], key=f"idea_t_{idea_key}",
                     )
                     edit_desc = st.text_area(
-                        "Descripción", value=idea["description"], height=140,
+                        "Description", value=idea["description"], height=140,
                         key=f"idea_d_{idea_key}",
                     )
                     confirm_delete = st.checkbox(
-                        "Confirmar borrado", key=f"idea_del_{idea_key}",
-                        help="Marca esta casilla antes de pulsar Eliminar idea.",
+                        "Confirm deletion", key=f"idea_del_{idea_key}",
+                        help="Check this box before pressing Delete idea.",
                     )
                     col_save, col_del = st.columns(2)
-                    save_clicked = col_save.form_submit_button("Guardar cambios")
-                    delete_clicked = col_del.form_submit_button("🗑️ Eliminar idea")
+                    save_clicked = col_save.form_submit_button("Save changes")
+                    delete_clicked = col_del.form_submit_button("🗑️ Delete idea")
 
                     if save_clicked:
                         if not edit_title.strip():
-                            st.error("El título es obligatorio.")
+                            st.error("The title is mandatory.")
                         else:
                             ideas[i] = {
                                 "title": edit_title.strip(),
@@ -396,7 +396,7 @@ with tab_ideas:
                             st.rerun()
                     elif delete_clicked:
                         if not confirm_delete:
-                            st.error("Marca 'Confirmar borrado' para eliminar la idea.")
+                            st.error("Check 'Confirm deletion' to delete the idea.")
                         else:
                             del ideas[i]
                             save_ideas(ideas_header, ideas)

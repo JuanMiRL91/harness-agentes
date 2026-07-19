@@ -1,24 +1,24 @@
-# Sesión actual
+# Current session
 
-> Este archivo se vacía al cerrar cada sesión y se mueve a `history.md`.
-> Mientras trabajas, **mantenlo actualizado en tiempo real**, no al final.
+> This file is emptied when each session closes and moved to `history.md`.
+> While you work, **keep it updated in real time**, not at the end.
 
-- **Feature en curso:** _ninguna_  <!-- formato: #N nombre_feature -->
-- **Inicio:** _—_
-- **Agente:** _—_
+- **Feature in progress:** _none_  <!-- format: #N feature_name -->
+- **Start:** _—_
+- **Agent:** _—_
 
 ## Plan
 
-_Describe en 3-5 bullets qué vas a hacer antes de tocar código._
+_Describe in 3-5 bullets what you are going to do before touching code._
 
-## Bitácora
+## Log
 
-_Anota aquí cada paso significativo: archivos creados, decisiones, bloqueos._
+_Note here every significant step: files created, decisions, blockers._
 
 - ...
 
-## Próximo paso
+## Next step
 
-_Si la sesión se interrumpe, lo primero que debe hacer la siguiente sesión._
+_If the session is interrupted, the first thing the next session must do._
 
 ---

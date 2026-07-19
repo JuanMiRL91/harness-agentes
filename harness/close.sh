@@ -1,36 +1,36 @@
 #!/usr/bin/env bash
-# harness/close.sh — Protocolo de cierre de sesión.
-# Ejecutar cuando una feature quede marcada como "done" en feature_list.json.
-# Uso: ./harness/close.sh  (desde la raíz del proyecto)
+# harness/close.sh — Session close protocol.
+# Run when a feature is marked as "done" in feature_list.json.
+# Usage: ./harness/close.sh  (from the project root)
 #
-# Pasos:
-#   1. Verifica que init.sh pasa al 100%
-#   2. Lee la feature recién completada desde progress/current.md
-#   3. Detecta cambios en core/ o ui/ y advierte si ni harness/docs/architecture.md
-#      ni harness/docs/data-models.md fueron tocados; cruza además los símbolos
-#      públicos del diff contra los docs (harness/check_docs.py, determinista)
-#   3b. Si el commit es un fix (BUG_), recuerda el ciclo sistémico bug→check del harness
-#   3c. Avisa si CLAUDE.md supera los 40.000 caracteres (debe mantenerse mínimo;
-#      el detalle va a architecture.md/data-models.md, el changelog a history.md)
-#   3d. Archiva las features done/Cancelled en harness/feature_list_archive.json
-#      (el fichero activo queda solo con tareas abiertas; ids globales entre ambos)
-#   4. Mueve progress/current.md al final de progress/history.md y lo resetea
-#   5. Hace commit automático con mensaje convencional
+# Steps:
+#   1. Verifies that init.sh passes 100%
+#   2. Reads the just-completed feature from progress/current.md
+#   3. Detects changes in core/ or ui/ and warns if neither harness/docs/architecture.md
+#      nor harness/docs/data-models.md were touched; also cross-checks the public
+#      symbols of the diff against the docs (harness/check_docs.py, deterministic)
+#   3b. If the commit is a fix (BUG_), reminds you of the systemic bug→check cycle
+#   3c. Warns if CLAUDE.md exceeds 40,000 characters (it must stay minimal;
+#      detail goes to architecture.md/data-models.md, changelog to history.md)
+#   3d. Archives done/Cancelled features into harness/feature_list_archive.json
+#      (the active file keeps only open tasks; global ids across both)
+#   4. Moves progress/current.md to the end of progress/history.md and resets it
+#   5. Makes the automatic commit with a conventional message
 #
-# Códigos de salida:
-#   0 = sesión cerrada (commit hecho, o nada que commitear)
-#   1 = error (init.sh en rojo, o la feature de current.md no está "done")
-#   3 = pausado: docs pendientes o CLAUDE.md >40k — corrige y re-ejecuta close.sh
-#       (con stdin no interactivo, p. ej. un agente, la pausa es automática)
+# Exit codes:
+#   0 = session closed (commit made, or nothing to commit)
+#   1 = error (init.sh red, or the feature in current.md is not "done")
+#   3 = paused: docs pending or CLAUDE.md >40k — fix and re-run close.sh
+#       (with non-interactive stdin, e.g. an agent, the pause is automatic)
 
 set -euo pipefail
 
-# Windows: cuando stdout de Python NO es una consola real (aquí, capturado por
-# `$(...)` de bash), Python usa el códec de la página de códigos ANSI del
-# sistema (p.ej. cp1252 en Windows en español) en vez de UTF-8 — corrompe
-# cualquier tilde/— que los bloques `"$PY" -c "..."` de este script escriban
-# a stdout para que bash los recoja (reproducido con el em-dash del header de
-# history.md). Forzar UTF-8 aquí es un no-op en Linux/macOS (ya usan UTF-8).
+# Windows: when Python's stdout is NOT a real console (here, captured by bash
+# `$(...)`), Python uses the system's ANSI code page codec (e.g. cp1252 on
+# Spanish Windows) instead of UTF-8 — corrupting any non-ASCII character that
+# the `"$PY" -c "..."` blocks of this script write to stdout for bash to
+# collect (reproduced with the em-dash of the history.md header). Forcing
+# UTF-8 here is a no-op on Linux/macOS (they already use UTF-8).
 export PYTHONIOENCODING=utf-8
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -47,7 +47,7 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 fail() { echo -e "${RED}[FAIL]${NC} $1"; }
 info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 
-# Detectar ejecutable Python (igual que init.sh)
+# Detect Python executable (same as init.sh)
 if python3 -c "import sys; sys.exit(0 if sys.version_info >= (3,9) else 1)" 2>/dev/null; then
     PY="python3"
 elif python -c "import sys; sys.exit(0 if sys.version_info >= (3,9) else 1)" 2>/dev/null; then
@@ -66,27 +66,27 @@ echo "  $(basename "$ROOT") — close.sh"
 echo "========================================"
 echo ""
 
-# ── 1. Entorno verde ──────────────────────────────────────────────────────────
-echo "▸ Verificando entorno (harness/init.sh)..."
+# ── 1. Green environment ─────────────────────────────────────────────────────
+echo "▸ Verifying environment (harness/init.sh)..."
 echo ""
 if ! bash harness/init.sh; then
     echo ""
-    fail "init.sh no pasa. Resuelve los errores antes de cerrar la sesión."
+    fail "init.sh does not pass. Fix the errors before closing the session."
     exit 1
 fi
 echo ""
 
-# ── 2. Detectar feature completada ───────────────────────────────────────────
-echo "▸ Feature completada"
+# ── 2. Detect completed feature ──────────────────────────────────────────────
+echo "▸ Completed feature"
 
-# Leer de current.md (antes de resetear)
-FEATURE_LINE=$(grep -m1 "Feature en curso" "$CURRENT" 2>/dev/null || true)
+# Read from current.md (before resetting)
+FEATURE_LINE=$(grep -m1 "Feature in progress" "$CURRENT" 2>/dev/null || true)
 FEATURE_ID=""
 FEATURE_NAME=""
 
 if echo "$FEATURE_LINE" | grep -qE "#[0-9]+"; then
     FEATURE_ID=$(echo "$FEATURE_LINE" | grep -oE "#[0-9]+" | head -1 | tr -d '#')
-    # Extraer nombre de feature_list.json por id
+    # Extract feature name from feature_list.json by id
     FEATURE_DATA=$("$PY" - <<PYEOF
 import json, os
 feat = None
@@ -107,12 +107,12 @@ PYEOF
     FEATURE_STATUS=$(echo "$FEATURE_DATA" | cut -d'|' -f3)
 
     if [ "$FEATURE_STATUS" != "done" ]; then
-        warn "La feature #$FEATURE_ID ($FEATURE_NAME) no está marcada como 'done' en feature_list.json."
-        warn "Márcala como done antes de cerrar la sesión."
+        warn "Feature #$FEATURE_ID ($FEATURE_NAME) is not marked as 'done' in feature_list.json."
+        warn "Mark it as done before closing the session."
         exit 1
     fi
 
-    # Tipo de commit: fix para bugs, feat para el resto
+    # Commit type: fix for bugs, feat for the rest
     if echo "$FEATURE_NAME" | grep -qi "^BUG_"; then
         COMMIT_TYPE="fix"
     else
@@ -122,47 +122,47 @@ PYEOF
     ok "Feature #$FEATURE_ID: $FEATURE_NAME — $FEATURE_TITLE"
 else
     COMMIT_TYPE="chore"
-    # Sin #id: usar el texto de "Feature en curso" como título del chore (sesiones de
-    # infraestructura sin entrada en el backlog).
-    CHORE_TITLE=$(echo "$FEATURE_LINE" | sed -E 's/.*Feature en curso:\*{0,2}//; s/<!--.*-->//; s/^[[:space:]_]+//; s/[[:space:]_]+$//')
-    if [ -n "$CHORE_TITLE" ] && [ "$CHORE_TITLE" != "ninguna" ]; then
+    # No #id: use the "Feature in progress" text as the chore title (infrastructure
+    # sessions without a backlog entry).
+    CHORE_TITLE=$(echo "$FEATURE_LINE" | sed -E 's/.*Feature in progress:\*{0,2}//; s/<!--.*-->//; s/^[[:space:]_]+//; s/[[:space:]_]+$//')
+    if [ -n "$CHORE_TITLE" ] && [ "$CHORE_TITLE" != "none" ]; then
         FEATURE_TITLE="$CHORE_TITLE"
-        info "Sin id de feature — commit como 'chore: ${CHORE_TITLE}'."
+        info "No feature id — committing as 'chore: ${CHORE_TITLE}'."
     else
-        warn "No se encontró referencia a feature en progress/current.md."
-        info "El commit usará el mensaje genérico 'chore: cierre de sesión'."
-        FEATURE_TITLE="cierre de sesión"
+        warn "No feature reference found in progress/current.md."
+        info "The commit will use the generic message 'chore: session close'."
+        FEATURE_TITLE="session close"
     fi
 fi
 echo ""
 
-# ── 3. ¿Necesitan actualización architecture.md / data-models.md? ────────────
-echo "▸ Comprobando documentación (harness/docs/architecture.md / data-models.md)"
+# ── 3. Do architecture.md / data-models.md need updating? ────────────────────
+echo "▸ Checking documentation (harness/docs/architecture.md / data-models.md)"
 
-# Ficheros de code modificados (staged + unstaged)
+# Modified code files (staged + unstaged)
 CHANGED_CODE=$(git status --porcelain -- core/ ui/ 2>/dev/null | wc -l | tr -d ' ')
 
 if [ "$CHANGED_CODE" -gt 0 ]; then
-    info "Hay $CHANGED_CODE fichero(s) modificado(s) en core/ o ui/."
+    info "There are $CHANGED_CODE modified file(s) in core/ or ui/."
 
     ARCH_CHANGED=$(git status --porcelain -- harness/docs/architecture.md 2>/dev/null | wc -l | tr -d ' ')
     DM_CHANGED=$(git status --porcelain -- harness/docs/data-models.md 2>/dev/null | wc -l | tr -d ' ')
     NEEDS_CONFIRM=0
 
     if [ "$ARCH_CHANGED" -eq 0 ] && [ "$DM_CHANGED" -eq 0 ]; then
-        warn "Ni harness/docs/architecture.md ni data-models.md fueron modificados — ¿dónde queda documentado el cambio?"
-        warn "Módulos/funciones/decisiones → architecture.md · esquemas JSON → data-models.md ·"
-        warn "changelog → progress/current.md (lo archiva este script) · CLAUDE.md solo si cambia el mapa de una línea."
+        warn "Neither harness/docs/architecture.md nor data-models.md were modified — where is the change documented?"
+        warn "Modules/functions/decisions → architecture.md · data schemas → data-models.md ·"
+        warn "changelog → progress/current.md (this script archives it) · CLAUDE.md only if the one-line map changes."
         NEEDS_CONFIRM=1
     else
-        [ "$ARCH_CHANGED" -gt 0 ] && ok "harness/docs/architecture.md actualizado"
-        [ "$DM_CHANGED" -gt 0 ] && ok "harness/docs/data-models.md actualizado"
+        [ "$ARCH_CHANGED" -gt 0 ] && ok "harness/docs/architecture.md updated"
+        [ "$DM_CHANGED" -gt 0 ] && ok "harness/docs/data-models.md updated"
     fi
 
-    # Cruce determinista: símbolos públicos añadidos/eliminados en el diff vs
-    # menciones en architecture.md / data-models.md / CLAUDE.md (lista exacta,
-    # no solo "¿se tocó el doc?") + cobertura de todos los módulos core/ y ui/
-    # en la sección Estructura de README.md
+    # Deterministic cross-check: public symbols added/removed in the diff vs
+    # mentions in architecture.md / data-models.md / CLAUDE.md (exact list,
+    # not just "was the doc touched?") + coverage of all core/ and ui/ modules
+    # in the Structure section of README.md
     if [ -f harness/check_docs.py ]; then
         if ! "$PY" harness/check_docs.py; then
             NEEDS_CONFIRM=1
@@ -172,59 +172,59 @@ if [ "$CHANGED_CODE" -gt 0 ]; then
     if [ "$NEEDS_CONFIRM" -eq 1 ]; then
         echo ""
         if [ -t 0 ]; then
-            echo -e "${YELLOW}  ¿Proceder igualmente sin actualizar los docs? [s/N]${NC} \c"
-            read -r RESPUESTA || RESPUESTA=""
+            echo -e "${YELLOW}  Proceed anyway without updating the docs? [y/N]${NC} \c"
+            read -r ANSWER || ANSWER=""
         else
-            RESPUESTA="N"
-            warn "stdin no interactivo — pausa automática (un agente no puede saltarse este aviso)."
+            ANSWER="N"
+            warn "non-interactive stdin — automatic pause (an agent cannot skip this warning)."
         fi
-        if [[ ! "$RESPUESTA" =~ ^[sS]$ ]]; then
-            warn "Sesión pausada (exit 3). Actualiza los docs y vuelve a ejecutar ./harness/close.sh"
+        if [[ ! "$ANSWER" =~ ^[yY]$ ]]; then
+            warn "Session paused (exit 3). Update the docs and re-run ./harness/close.sh"
             exit 3
         fi
     fi
 else
-    ok "Sin cambios en core/ o ui/ — docs no requieren actualización"
+    ok "No changes in core/ or ui/ — docs need no update"
 fi
 echo ""
 
-# ── 3b. Bug cerrado → mejora sistémica del harness ───────────────────────────
+# ── 3b. Closed bug → systemic harness improvement ────────────────────────────
 if [ "${COMMIT_TYPE:-}" = "fix" ]; then
-    echo "▸ Ciclo sistémico (bug → check del harness)"
+    echo "▸ Systemic cycle (bug → harness check)"
     HARNESS_CHANGED=$(git status --porcelain -- harness/ .claude/ 2>/dev/null | wc -l | tr -d ' ')
     if [ "$HARNESS_CHANGED" -eq 0 ]; then
-        warn "Cierras un BUG_ sin cambios en harness/ ni .claude/ — ¿qué check habría detectado este bug antes?"
-        warn "Si existe uno razonable, añádelo (skill improve-harness) antes de cerrar; si no aplica, anótalo en current.md ('Check sistémico: no aplica — motivo')."
+        warn "You are closing a BUG_ with no changes in harness/ or .claude/ — which check would have caught this bug earlier?"
+        warn "If a reasonable one exists, add it (improve-harness skill) before closing; if not applicable, note it in current.md ('Systemic check: not applicable — reason')."
     else
-        ok "El fix incluye cambios en harness/ o .claude/ (ciclo sistémico atendido)"
+        ok "The fix includes changes in harness/ or .claude/ (systemic cycle addressed)"
     fi
     echo ""
 fi
 
-# ── 3c. CLAUDE.md debe mantenerse mínimo (≤40.000 caracteres) ─────────────────
-echo "▸ Tamaño de CLAUDE.md"
+# ── 3c. CLAUDE.md must stay minimal (≤40,000 characters) ─────────────────────
+echo "▸ CLAUDE.md size"
 CLAUDE_CHARS=$("$PY" -c "print(len(open('CLAUDE.md', encoding='utf-8').read()))" 2>/dev/null || echo 0)
 if [ "$CLAUDE_CHARS" -gt 40000 ]; then
-    warn "CLAUDE.md tiene $CLAUDE_CHARS caracteres (límite: 40000) — se inyecta entero en cada sesión."
-    warn "Mueve el detalle a harness/docs/architecture.md o data-models.md; el changelog va a progress/history.md."
+    warn "CLAUDE.md has $CLAUDE_CHARS characters (limit: 40000) — it is injected whole into every session."
+    warn "Move the detail to harness/docs/architecture.md or data-models.md; the changelog goes to progress/history.md."
     if [ -t 0 ]; then
-        echo -e "${YELLOW}  ¿Proceder igualmente con CLAUDE.md por encima del límite? [s/N]${NC} \c"
-        read -r RESPUESTA_CLAUDE || RESPUESTA_CLAUDE=""
+        echo -e "${YELLOW}  Proceed anyway with CLAUDE.md over the limit? [y/N]${NC} \c"
+        read -r ANSWER_CLAUDE || ANSWER_CLAUDE=""
     else
-        RESPUESTA_CLAUDE="N"
-        warn "stdin no interactivo — pausa automática (un agente no puede saltarse este aviso)."
+        ANSWER_CLAUDE="N"
+        warn "non-interactive stdin — automatic pause (an agent cannot skip this warning)."
     fi
-    if [[ ! "$RESPUESTA_CLAUDE" =~ ^[sS]$ ]]; then
-        warn "Sesión pausada (exit 3). Reduce CLAUDE.md y vuelve a ejecutar ./harness/close.sh"
+    if [[ ! "$ANSWER_CLAUDE" =~ ^[yY]$ ]]; then
+        warn "Session paused (exit 3). Reduce CLAUDE.md and re-run ./harness/close.sh"
         exit 3
     fi
 else
-    ok "CLAUDE.md dentro del límite ($CLAUDE_CHARS / 40000 caracteres)"
+    ok "CLAUDE.md within the limit ($CLAUDE_CHARS / 40000 characters)"
 fi
 echo ""
 
-# ── 3d. Archivar features cerradas ────────────────────────────────────────────
-echo "▸ Archivando features cerradas (done/Cancelled → feature_list_archive.json)"
+# ── 3d. Archive closed features ──────────────────────────────────────────────
+echo "▸ Archiving closed features (done/Cancelled → feature_list_archive.json)"
 ARCHIVED_N=$("$PY" - <<'PYEOF'
 import json
 
@@ -240,9 +240,9 @@ try:
 except FileNotFoundError:
     archive = {
         "project": active.get("project", ""),
-        "description": "Archivo historico de features cerradas (done/Cancelled), "
-                       "movidas aqui por close.sh. Ids globales con feature_list.json: "
-                       "nunca se reutilizan ni se renumeran.",
+        "description": "Historical archive of closed features (done/Cancelled), "
+                       "moved here by close.sh. Global ids with feature_list.json: "
+                       "never reused or renumbered.",
         "rules": active.get("rules", {}),
         "features": [],
     }
@@ -260,20 +260,20 @@ print(len(closed))
 PYEOF
 )
 if [ "${ARCHIVED_N:-0}" -gt 0 ]; then
-    ok "${ARCHIVED_N} feature(s) archivada(s) en harness/feature_list_archive.json"
+    ok "${ARCHIVED_N} feature(s) archived in harness/feature_list_archive.json"
 else
-    ok "Nada que archivar (sin done/Cancelled en el fichero activo)"
+    ok "Nothing to archive (no done/Cancelled in the active file)"
 fi
 echo ""
 
-# ── 4. Actualizar progress/ ───────────────────────────────────────────────────
-echo "▸ Actualizando progress/"
+# ── 4. Update progress/ ──────────────────────────────────────────────────────
+echo "▸ Updating progress/"
 
 IS_TEMPLATE=$("$PY" -c "
 import re, sys
 content = open('$CURRENT', encoding='utf-8').read()
-# Plantilla vacía = tiene la línea de ninguna feature y ningún contenido real en Bitácora
-empty = ('_ninguna_' in content) and ('- ...' in content)
+# Empty template = has the no-feature line and no real content in the Log
+empty = ('_none_' in content) and ('- ...' in content)
 print('1' if empty else '0')
 ")
 
@@ -283,25 +283,25 @@ import re, sys
 content = open('$CURRENT', encoding='utf-8').read()
 content = re.sub(r'^> .*\n', '', content, flags=re.MULTILINE)
 content = re.sub(r'\n{3,}', '\n\n', content)
-date_m = re.search(r'\*\*Inicio:\*\*\s*(\d{4}-\d{2}-\d{2})', content)
+date_m = re.search(r'\*\*Start:\*\*\s*(\d{4}-\d{2}-\d{2})', content)
 date_str = date_m.group(1) if date_m else '????-??-??'
-feat_line_m = re.search(r'\*\*Feature en curso:\*\*\s*(.+)', content)
+feat_line_m = re.search(r'\*\*Feature in progress:\*\*\s*(.+)', content)
 header = None
 if feat_line_m:
     val = re.sub(r'<!--.*?-->', '', feat_line_m.group(1)).strip()
-    # Acepta '#N nombre', 'nombre (#N)', 'nombre [N]' — el orden y el
-    # delimitador han variado entre sesiones, así que se busca el id en
-    # cualquier posición en vez de exigir que vaya primero.
+    # Accepts '#N name', 'name (#N)', 'name [N]' — the order and the delimiter
+    # have varied between sessions, so the id is searched at any position
+    # instead of requiring it to come first.
     id_m = re.search(r'#(\d+)|\[(\d+)\]', val)
-    if id_m and val != '_ninguna_':
+    if id_m and val != '_none_':
         fid = id_m.group(1) or id_m.group(2)
         name_part = (val[:id_m.start()] + val[id_m.end():]).strip(' ()[]' + chr(96) + ':')
         name_part = re.sub(r'^Feature\s+', '', name_part, flags=re.IGNORECASE).strip()
         if name_part:
             header = '## ' + date_str + ' — #' + fid + ' ' + name_part
 if not header:
-    header = '## ' + date_str + ' — Sesión cerrada'
-content = re.sub(r'^# Ses.*', header, content, count=1, flags=re.MULTILINE)
+    header = '## ' + date_str + ' — Session closed'
+content = re.sub(r'^# Current session.*', header, content, count=1, flags=re.MULTILINE)
 sys.stdout.write(content)
 ")
     {
@@ -310,47 +310,47 @@ sys.stdout.write(content)
         echo ""
         printf '%s\n' "$TRANSFORMED"
     } >> "$HISTORY"
-    ok "Sesión añadida a history.md"
+    ok "Session appended to history.md"
 else
-    info "current.md está vacío (plantilla), no se añade a history.md"
+    info "current.md is empty (template), not appended to history.md"
 fi
 
 cat > "$CURRENT" << 'TEMPLATE'
-# Sesión actual
+# Current session
 
-> Este archivo se vacía al cerrar cada sesión y se mueve a `history.md`.
-> Mientras trabajas, **mantenlo actualizado en tiempo real**, no al final.
+> This file is emptied when each session closes and moved to `history.md`.
+> While you work, **keep it updated in real time**, not at the end.
 
-- **Feature en curso:** _ninguna_  <!-- formato: #N nombre_feature -->
-- **Inicio:** _—_
-- **Agente:** _—_
+- **Feature in progress:** _none_  <!-- format: #N feature_name -->
+- **Start:** _—_
+- **Agent:** _—_
 
 ## Plan
 
-_Describe en 3-5 bullets qué vas a hacer antes de tocar código._
+_Describe in 3-5 bullets what you are going to do before touching code._
 
-## Bitácora
+## Log
 
-_Anota aquí cada paso significativo: archivos creados, decisiones, bloqueos._
+_Note here every significant step: files created, decisions, blockers._
 
 - ...
 
-## Próximo paso
+## Next step
 
-_Si la sesión se interrumpe, lo primero que debe hacer la siguiente sesión._
+_If the session is interrupted, the first thing the next session must do._
 
 ---
 TEMPLATE
-ok "current.md reseteado a plantilla"
+ok "current.md reset to template"
 echo ""
 
-# ── 5. Commit automático ──────────────────────────────────────────────────────
-echo "▸ Commit automático"
+# ── 5. Automatic commit ──────────────────────────────────────────────────────
+echo "▸ Automatic commit"
 
 git add -A
 
 if git diff --cached --quiet; then
-    info "Nada que commitear — el working tree ya estaba limpio."
+    info "Nothing to commit — the working tree was already clean."
 else
     if [ -n "$FEATURE_ID" ]; then
         COMMIT_MSG="${COMMIT_TYPE}(#${FEATURE_ID}): ${FEATURE_NAME} — ${FEATURE_TITLE}"
@@ -364,5 +364,5 @@ fi
 
 echo ""
 echo "========================================"
-echo -e "${GREEN}  ✓ Sesión cerrada correctamente.${NC}"
+echo -e "${GREEN}  ✓ Session closed successfully.${NC}"
 echo "========================================"

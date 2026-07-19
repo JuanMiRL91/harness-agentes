@@ -1,79 +1,81 @@
 ---
 name: add-bug
-description: Registrar un bug nuevo en el backlog del harness (harness/feature_list.json) del proyecto, en estado "pending" y con el prefijo de nombre BUG_ para que el agente lo recoja ANTES que las features. Úsala cuando el usuario reporte un error, un fallo, un traceback o un comportamiento incorrecto para anotarlo (no para arreglarlo en el momento).
+description: Register a new bug in the harness backlog (harness/feature_list.json) of the project, in "pending" status and with the BUG_ name prefix so the agent picks it up BEFORE the features. Use it when the user reports an error, a failure, a traceback or incorrect behavior, to note it down (not to fix it on the spot).
 ---
 
-# Añadir un bug a `harness/feature_list.json`
+# Adding a bug to `harness/feature_list.json`
 
-Registra un **bug** en el mismo backlog que las features, pero marcándolo con el prefijo
-`BUG_` en `name`. Ese prefijo es lo que hace que el agente que lee `AGENTS.md` lo coja
-**antes** que cualquier feature `pending` (ver §4 de `AGENTS.md`). **No arregla** el bug:
-solo lo registra en estado `"pending"`.
+Registers a **bug** in the same backlog as the features, but marking it with the
+`BUG_` prefix in `name`. That prefix is what makes the agent reading `AGENTS.md`
+take it **before** any `pending` feature (see §4 of `AGENTS.md`). It does **not fix**
+the bug: it only registers it in `"pending"` status.
 
-Para registrar features normales usa la skill hermana `add-feature`. Este skill comparte su
-esquema y convenciones; aquí solo cambian el prefijo `BUG_` y la plantilla de `acceptance`.
+To register normal features use the sibling skill `add-feature`. This skill shares
+its schema and conventions; only the `BUG_` prefix and the `acceptance` template differ.
 
-## Fichero y esquema
+## File and schema
 
-`harness/feature_list.json` (raíz del repo). Array `features` de objetos planos con **exactamente**
-estos campos (indentación de 2 espacios), igual que una feature. Las tareas cerradas NO están aquí:
-`close.sh` las mueve a `harness/feature_list_archive.json` (mismo esquema, solo `done`/`Cancelled`);
-los ids son **globales** entre ambos ficheros:
+`harness/feature_list.json` (repo root). Array `features` of flat objects with
+**exactly** these fields (2-space indentation), same as a feature. Closed tasks are
+NOT here: `close.sh` moves them to `harness/feature_list_archive.json` (same schema,
+only `done`/`Cancelled`); ids are **global** across both files:
 
 ```jsonc
 {
-  "id": 34,                          // entero, secuencial = (max id actual) + 1
-  "name": "BUG_cotizacion_vacia",    // SIEMPRE prefijo BUG_ + slug snake_case
-  "title": "Título en español",      // corto, qué falla
-  "description": "Síntoma + traceback completo + fichero/función donde ocurre + cómo reproducir. Termina SIEMPRE con una línea 'Verificación E2E: sí — <páginas a recorrer>' o 'Verificación E2E: no — <motivo>' (ver convenciones).",
+  "id": 34,                          // integer, sequential = (current max id) + 1
+  "name": "BUG_empty_quote",         // ALWAYS BUG_ prefix + snake_case slug
+  "title": "Short title of what fails",
+  "description": "Symptom + full traceback + file/function where it happens + how to reproduce. ALWAYS end with a line 'E2E verification: yes — <pages to walk>' or 'E2E verification: no — <reason>' (see conventions).",
   "acceptance": [
-    "Reproducir el error y localizar la causa en <fichero>",
-    "Arreglar el bug — comprobable con <comando o paso de UI concreto que antes fallaba>",
-    "tests/test_X.py cubre el caso para que no vuelva a ocurrir (pytest tests/test_X.py -k caso)"
+    "Reproduce the error and locate the cause in <file>",
+    "Fix the bug — checkable with <command or concrete UI step that previously failed>",
+    "tests/test_X.py covers the case so it does not happen again (pytest tests/test_X.py -k case)"
   ],
-  "status": "pending"                // SIEMPRE pending al crear
+  "status": "pending"                // ALWAYS pending on creation
 }
 ```
 
-No añadas campos extra (no hay `priority`, `type`, `category`…). El "tipo bug" se codifica
-**solo** con el prefijo `BUG_` en `name`. No cambies las `rules`.
+Do not add extra fields (no `priority`, `type`, `category`…). The "bug type" is
+encoded **only** with the `BUG_` prefix in `name`. Do not change the `rules`.
 
-## Convenciones
+## Conventions
 
-- **`name`**: **siempre** empieza por `BUG_`, seguido de un slug `snake_case` corto y
-  descriptivo en inglés (`BUG_cotizacion_vacia`, `BUG_duplicate_key_ficha`). El prefijo es
-  obligatorio: es el marcador que prioriza el bug.
-- **`id`**: secuencial, nunca se reutiliza ni se renumera. El siguiente = max entre
-  `feature_list.json` **y** `feature_list_archive.json` + 1.
-- **`description`**: pega el **traceback completo** si lo hay, indica el fichero/función y los
-  pasos para reproducir (qué pantalla/acción lo dispara). Cuanto más concreto, mejor.
-  Si el bug puede depender del sistema (encoding, rutas, `python` vs `python3`…), anota en qué
-  máquina ocurrió si el proyecto corre en varias: hay bugs específicos de SO.
-- **`acceptance`**: por defecto sigue el patrón *reproducir → arreglar → test de regresión*.
-  Ajusta el nombre del test al área afectada (`tests/test_<módulo>.py`).
-  Cada criterio debe ser **auto-comprobable**: indica el comando exacto del test, o —si el
-  síntoma es de UI— el paso observable prefijado `UI:` (página/acción/resultado esperado),
-  verificable con la skill `verify`. Así el agente puede cerrar el bug como condición de
-  salida de un loop `/goal` sin intervención humana.
-- **Verificación E2E (skill `verify`)**: la última línea de `description` declara si el
-  fix requiere la verificación E2E con la app real al cerrarlo (solo se ejecuta justo
-  antes de `./harness/close.sh` o por petición explícita del usuario, nunca en el init):
-  - `Verificación E2E: sí — <páginas/pestañas a recorrer>` si el síntoma es de UI o el
-    fix toca `core/` con impacto visible en alguna página (lo habitual en bugs).
-  - `Verificación E2E: no — <motivo>` para fixes pequeños sin síntoma de UI: solo
-    `harness/`/`tests/`/docs, o un fallo de `core/` totalmente cubierto por el test de
-    regresión sin efecto observable en pantalla.
-  En caso de duda, `sí`. Si es `no`, los criterios de `acceptance` no deben incluir
-  pasos `UI:` (serían incoherentes).
-- **Idioma**: `title`/`description`/`acceptance` en español; nombres de código, claves y
-  ficheros en inglés.
-- **`status`**: al crear, **siempre `pending`**.
+- **`name`**: **always** starts with `BUG_`, followed by a short, descriptive
+  `snake_case` slug in English (`BUG_empty_quote`, `BUG_duplicate_key_page`). The
+  prefix is mandatory: it is the marker that prioritizes the bug.
+- **`id`**: sequential, never reused or renumbered. The next one = max across
+  `feature_list.json` **and** `feature_list_archive.json` + 1.
+- **`description`**: paste the **full traceback** if there is one, state the
+  file/function and the steps to reproduce (which screen/action triggers it). The
+  more concrete, the better. If the bug may depend on the system (encoding, paths,
+  `python` vs `python3`…), note which machine it happened on if the project runs on
+  several: there are OS-specific bugs.
+- **`acceptance`**: by default follows the *reproduce → fix → regression test*
+  pattern. Adjust the test name to the affected area (`tests/test_<module>.py`).
+  Each criterion must be **self-checkable**: state the exact test command, or — if
+  the symptom is UI — the observable step prefixed `UI:` (page/action/expected
+  result), verifiable with the `verify` skill. That way the agent can close the bug
+  as the exit condition of a `/goal` loop without human intervention.
+- **E2E verification (`verify` skill)**: the last line of `description` declares
+  whether the fix requires E2E verification with the real app on close (it only runs
+  right before `./harness/close.sh` or on explicit user request, never in the init):
+  - `E2E verification: yes — <pages/tabs to walk>` if the symptom is UI or the fix
+    touches `core/` with visible impact on some page (the usual case for bugs).
+  - `E2E verification: no — <reason>` for small fixes with no UI symptom: only
+    `harness/`/`tests/`/docs, or a `core/` failure fully covered by the regression
+    test with no observable effect on screen.
+  When in doubt, `yes`. If it is `no`, the `acceptance` criteria must not include
+  `UI:` steps (they would be incoherent).
+- **Language**: everything in English — `title`/`description`/`acceptance`, code
+  names, keys and files.
+- **`status`**: on creation, **always `pending`**.
 
-## Flujo de trabajo
+## Workflow
 
-1. **Entender el bug.** Identifica síntoma, traceback, fichero/función y reproducción. Si el
-   usuario pega un error de Streamlit/Python, consérvalo entero en `description`.
-2. **Leer el backlog pendiente** (no solo el código actual):
+1. **Understand the bug.** Identify symptom, traceback, file/function and
+   reproduction. If the user pastes a framework/Python error, keep it whole in
+   `description`.
+2. **Read the pending backlog** (not only the current code):
    ```bash
    python3 -c "
    import json
@@ -81,19 +83,21 @@ No añadas campos extra (no hay `priority`, `type`, `category`…). El "tipo bug
        if f['status'] == 'pending': print(f['id'], f['name'], '·', f['title'])
    "
    ```
-   Con dos objetivos:
-   - **Evitar duplicados**: si un `BUG_*` pendiente ya registra el mismo síntoma, díselo al
-     usuario en vez de duplicarlo.
-   - **Usarlas como contexto**: si una tarea `pending` (bug o feature) va a reescribir o
-     reestructurar el código donde ocurre el fallo, deja la relación explícita en
-     `description` (p. ej. "el código afectado lo reescribe #NN; verificar si el fix sigue
-     aplicando después") y ajusta `acceptance` a cómo quedará ese código, no solo a cómo
-     está hoy. Lee la `description` completa de las pendientes que toquen la misma área.
-3. **Explorar lo justo.** Para referenciar bien el fichero/función, mira el "Mapa de módulos"
-   de `harness/docs/architecture.md` (esquemas JSON en `harness/docs/data-models.md`); lee el
-   fichero concreto solo si hace falta precisión. No re-explores el repo.
-4. **Calcular el siguiente id** (no asumas, y hazlo **justo antes de escribir**: otra sesión o
-   job en paralelo puede haber añadido entradas desde que abriste el fichero):
+   With two goals:
+   - **Avoid duplicates**: if a pending `BUG_*` already registers the same symptom,
+     tell the user instead of duplicating it.
+   - **Use them as context**: if a `pending` task (bug or feature) is going to
+     rewrite or restructure the code where the failure happens, make the relation
+     explicit in `description` (e.g. "the affected code is rewritten by #NN; check
+     whether the fix still applies afterwards") and adjust `acceptance` to how that
+     code will end up, not only how it is today. Read the full `description` of the
+     pending tasks touching the same area.
+3. **Explore just enough.** To reference the file/function correctly, look at the
+   "Module map" of `harness/docs/architecture.md` (data schemas in
+   `harness/docs/data-models.md`); read the concrete file only if precision is
+   needed. Do not re-explore the repo.
+4. **Compute the next id** (do not assume, and do it **right before writing**:
+   another session or parallel job may have added entries since you opened the file):
    ```bash
    python3 -c "
    import json
@@ -106,40 +110,42 @@ No añadas campos extra (no hay `priority`, `type`, `category`…). El "tipo bug
    print(mx + 1)
    "
    ```
-5. **Redactar y añadir** la entrada justo antes del `]` de cierre del array `features`, con
-   `name` que empiece por `BUG_`, id consecutivo, `status: "pending"` y la indentación del fichero.
-6. **Validar** (ver abajo).
-7. **Resumir** al usuario la entrada creada (`id · name · título`) y recordarle que, al leer
-   `AGENTS.md`, el agente cogerá este bug antes que las features pending. **No** commitear salvo
-   que lo pida; **no** marcar `in_progress`; **no** arreglar el bug.
+5. **Write and add** the entry right before the closing `]` of the `features` array,
+   with a `name` starting with `BUG_`, consecutive id, `status: "pending"` and the
+   file's indentation.
+6. **Validate** (see below).
+7. **Summarize** to the user the created entry (`id · name · title`) and remind them
+   that, when reading `AGENTS.md`, the agent will take this bug before the pending
+   features. Do **not** commit unless asked; do **not** mark `in_progress`; do
+   **not** fix the bug.
 
-## Verificación
+## Verification
 
 ```bash
 python3 -c "
 import json
-d = json.load(open('harness/feature_list.json'))           # parsea sin error
+d = json.load(open('harness/feature_list.json'))           # parses without error
 fs = d['features']; valid = set(d['rules']['valid_status'])
 try:
     arch = json.load(open('harness/feature_list_archive.json'))['features']
 except FileNotFoundError:
     arch = []
 ids = [f['id'] for f in fs] + [f['id'] for f in arch]
-assert len(ids) == len(set(ids)), 'ids duplicados (archivo incluido)'
+assert len(ids) == len(set(ids)), 'duplicated ids (archive included)'
 for f in fs:
-    assert f['status'] in valid, f'status invalido en {f[\"id\"]}'
-    assert set(f) == {'id','name','title','description','acceptance','status'}, f'campos raros en {f[\"id\"]}'
-nuevo = max(fs, key=lambda f: f['id'])
-assert nuevo['name'].upper().startswith('BUG'), 'el bug nuevo debe empezar por BUG_'
-print('OK:', len(fs), 'activas ·', len(arch), 'archivadas; ultimo bug:', nuevo['name'])
+    assert f['status'] in valid, f'invalid status in {f[\"id\"]}'
+    assert set(f) == {'id','name','title','description','acceptance','status'}, f'odd fields in {f[\"id\"]}'
+new = max(fs, key=lambda f: f['id'])
+assert new['name'].upper().startswith('BUG'), 'the new bug must start with BUG_'
+print('OK:', len(fs), 'active ·', len(arch), 'archived; last bug:', new['name'])
 "
-git diff harness/feature_list.json   # solo la entrada añadida antes del ] final; resto intacto
+git diff harness/feature_list.json   # only the entry added before the final ]; rest intact
 ```
 
-## Qué NO hacer
+## What NOT to do
 
-- No omitir el prefijo `BUG_` (sin él, el bug no se prioriza).
-- No marcar `done`/`in_progress` ni arreglar el código en este flujo.
-- No commitear ni hacer push salvo petición explícita.
-- No añadir campos fuera del esquema (nada de `type`/`category`/`priority`) ni cambiar las `rules`.
-- No tocar entradas existentes (ids inmutables).
+- Do not omit the `BUG_` prefix (without it, the bug is not prioritized).
+- Do not mark `done`/`in_progress` or fix the code in this flow.
+- Do not commit or push unless explicitly asked.
+- Do not add fields outside the schema (no `type`/`category`/`priority`) or change the `rules`.
+- Do not touch existing entries (immutable ids).

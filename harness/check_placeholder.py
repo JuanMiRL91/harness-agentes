@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Detecta texto placeholder/erroneo conocido en literales de cadena de core/ y ui/.
+"""Detects known placeholder/erroneous text in core/ and ui/ string literals.
 
-Origen tipico: texto de relleno que llega a produccion sin que nadie lo
-detecte. Este check recorre por AST los literales de cadena (incluidas f-strings)
-de core/ y ui/ y falla si contienen algun termino de la lista negra.
+Typical origin: filler text that reaches production without anyone noticing.
+This check walks the string literals (f-strings included) of core/ and ui/ by
+AST and fails if they contain any blacklisted term.
 
-Solo stdlib. Exit 0 si limpio, 1 si hay hallazgos.
+Stdlib only. Exit 0 if clean, 1 if there are findings.
 """
 
 import ast
@@ -18,48 +18,48 @@ GREEN = "\033[0;32m"
 RED = "\033[0;31m"
 NC = "\033[0m"
 
-# Terminos que nunca deben aparecer en una cadena de produccion.
-# (termino, case_sensitive)
+# Terms that must never appear in a production string.
+# (term, case_sensitive)
 FORBIDDEN = [
-    ("lorem ipsum", False),     # texto de relleno clasico
-    ("TODO:", True),            # marcador pendiente dentro de un literal visible
+    ("lorem ipsum", False),     # classic filler text
+    ("TODO:", True),            # pending marker inside a visible literal
     ("FIXME", True),
 ]
 
 SCAN_DIRS = ["core", "ui"]
 
 
-def _strings_de(tree: ast.AST):
-    """Genera (lineno, valor) de cada literal str del arbol, f-strings incluidas."""
+def _strings_of(tree: ast.AST):
+    """Yields (lineno, value) for each str literal in the tree, f-strings included."""
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             yield node.lineno, node.value
 
 
 def main() -> int:
-    hallazgos = []
+    findings = []
     for d in SCAN_DIRS:
         for py in sorted((ROOT / d).rglob("*.py")):
             try:
                 tree = ast.parse(py.read_text(encoding="utf-8"))
             except SyntaxError as e:
-                hallazgos.append((py, e.lineno or 0, f"SyntaxError: {e.msg}"))
+                findings.append((py, e.lineno or 0, f"SyntaxError: {e.msg}"))
                 continue
-            for lineno, valor in _strings_de(tree):
-                for termino, case_sensitive in FORBIDDEN:
-                    pajar = valor if case_sensitive else valor.lower()
-                    aguja = termino if case_sensitive else termino.lower()
-                    if aguja in pajar:
-                        hallazgos.append((py, lineno, f"contiene '{termino}'"))
+            for lineno, value in _strings_of(tree):
+                for term, case_sensitive in FORBIDDEN:
+                    haystack = value if case_sensitive else value.lower()
+                    needle = term if case_sensitive else term.lower()
+                    if needle in haystack:
+                        findings.append((py, lineno, f"contains '{term}'"))
 
-    if hallazgos:
-        for py, lineno, motivo in hallazgos:
+    if findings:
+        for py, lineno, reason in findings:
             rel = py.relative_to(ROOT)
-            print(f"{RED}[FAIL]{NC}   {rel}:{lineno} — {motivo}")
-        print(f"{RED}[FAIL]{NC}   {len(hallazgos)} literal(es) con texto placeholder/erroneo")
+            print(f"{RED}[FAIL]{NC}   {rel}:{lineno} — {reason}")
+        print(f"{RED}[FAIL]{NC}   {len(findings)} literal(s) with placeholder/erroneous text")
         return 1
 
-    print(f"{GREEN}[OK]{NC}   Sin texto placeholder en literales de core/ y ui/")
+    print(f"{GREEN}[OK]{NC}   No placeholder text in core/ and ui/ literals")
     return 0
 
 

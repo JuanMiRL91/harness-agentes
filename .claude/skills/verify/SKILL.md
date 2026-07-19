@@ -1,126 +1,128 @@
 ---
 name: verify
-description: Verificación E2E de la app tras un cambio en core/ o ui/ — arranca la app real, recorre las páginas afectadas con el navegador, y comprueba de forma cuantitativa que no hay excepciones nuevas ni en el log de la app ni en la terminal. Ejecutar SOLO como último paso antes de ./harness/close.sh (si la tarea la requiere) o cuando el usuario pida verificar explícitamente — NUNCA en init.sh ni al inicio de sesión. Los tests y check_contracts.py NO sustituyen este paso.
+description: E2E verification of the app after a change in core/ or ui/ — starts the real app, walks the affected pages with the browser, and quantitatively checks that there are no new exceptions in the app log or the terminal. Run ONLY as the last step before ./harness/close.sh (if the task requires it) or when the user explicitly asks to verify — NEVER in init.sh or at session start. Tests and check_contracts.py do NOT replace this step.
 ---
 
-# Verificar la app de punta a punta
+# Verifying the app end to end
 
-> **Adaptar al proyecto:** sustituye `<comando de arranque>` y `<log de la app>` por los
-> valores reales (p. ej. `streamlit run ui/inicio.py` y `logs/app.log`) la primera vez
-> que adoptes el harness.
+> **Adapt to the project:** replace `<app start command>` and `<app log file>` with the
+> real values (e.g. `streamlit run ui/home.py` and `logs/app.log`) the first time you
+> adopt the harness.
 
-Los tests de `tests/` y `harness/check_contracts.py` no ejercitan la UI real: hay bugs
-que solo se ven **usando la app**. Esta skill codifica esa prueba manual como checks
-reproducibles y cuantitativos. Cuanto más cuantitativo el check, mejor te
-auto-verificas: cada paso de abajo tiene un criterio de éxito medible, no una impresión.
+The tests in `tests/` and `harness/check_contracts.py` do not exercise the real UI:
+there are bugs that only show up **using the app**. This skill codifies that manual
+test as reproducible, quantitative checks. The more quantitative the check, the
+better you self-verify: every step below has a measurable success criterion, not an
+impression.
 
-## Cuándo se ejecuta (y cuándo NO)
+## When it runs (and when NOT)
 
-Solo hay **dos** disparadores válidos:
+There are only **two** valid triggers:
 
-1. **Cierre de sesión:** como último paso antes de `./harness/close.sh`, cuando la tarea
-   está completada y su `description` en `harness/feature_list.json` indica
-   `Verificación E2E: sí` (o tiene criterios `UI:` en `acceptance`).
-2. **Invocación directa del usuario:** solo si pide verificar de forma explícita e
-   inequívoca ("verifica la app", "pasa /verify", "comprueba la UI de punta a punta").
-   Una mención genérica a "comprobar" o "revisar" el código NO cuenta.
+1. **Session close:** as the last step before `./harness/close.sh`, when the task is
+   completed and its `description` in `harness/feature_list.json` states
+   `E2E verification: yes` (or has `UI:` criteria in `acceptance`).
+2. **Direct user invocation:** only if they ask to verify explicitly and
+   unambiguously ("verify the app", "run /verify", "check the UI end to end").
+   A generic mention of "checking" or "reviewing" the code does NOT count.
 
-**NUNCA** ejecutarla al inicio de sesión, dentro de `./harness/init.sh`, ni como
-exploración previa: es la skill más cara en tokens del harness y su valor está en
-verificar el cambio YA hecho, no el estado de partida.
+**NEVER** run it at session start, inside `./harness/init.sh`, or as prior
+exploration: it is the most token-expensive skill in the harness and its value lies
+in verifying the change ALREADY made, not the starting state.
 
-No aplica a cambios que solo tocan `harness/`, `tests/` o docs (ahí basta
-`./harness/init.sh`), ni a tareas cuya `description` diga `Verificación E2E: no`
-(cambios pequeños sin flujo de UI nuevo). Si la tarea toca `core/` o `ui/` y su
-`description` no dice nada, aplica el criterio por defecto: ejecutarla.
+It does not apply to changes that only touch `harness/`, `tests/` or docs (there
+`./harness/init.sh` is enough), nor to tasks whose `description` says
+`E2E verification: no` (small changes with no new UI flow). If the task touches
+`core/` or `ui/` and its `description` says nothing, apply the default criterion:
+run it.
 
-## Elegir el navegador (en este orden)
+## Choosing the browser (in this order)
 
-1. **Navegador integrado** (app de escritorio de Claude): herramientas
-   `mcp__Claude_Browser__*` (`preview_start`, `read_page`, `computer`, …).
-   **Es la vía preferida**: arranca la app desde `.claude/launch.json`, gestiona el
-   proceso y da acceso a logs del servidor (`preview_logs`) y consola del navegador
-   (`read_console_messages`) sin trabajo extra.
-2. **Chrome real** (`mcp__claude-in-chrome__*`, cárgalas vía ToolSearch en UNA llamada
-   si están deferred): solo si el navegador integrado no está disponible. En este caso
-   arranca la app tú mismo con Bash (ver variante del paso 2).
-3. **Sin navegador**: si la UI renderiza por websocket (p. ej. Streamlit), un `curl` al
-   puerto solo devuelve el shell HTML y NO sirve como verificación de contenido. Deja
-   constancia explícita de que la verificación visual quedó pendiente del usuario (no
-   la des por hecha).
+1. **Integrated browser** (Claude desktop app): `mcp__Claude_Browser__*` tools
+   (`preview_start`, `read_page`, `computer`, …). **It is the preferred way**: it
+   starts the app from `.claude/launch.json`, manages the process and gives access
+   to server logs (`preview_logs`) and the browser console
+   (`read_console_messages`) with no extra work.
+2. **Real Chrome** (`mcp__claude-in-chrome__*`, load them via ToolSearch in ONE call
+   if deferred): only if the integrated browser is not available. In this case start
+   the app yourself with Bash (see the step 2 variant).
+3. **No browser**: if the UI renders over a websocket (e.g. Streamlit), a `curl` to
+   the port only returns the HTML shell and does NOT count as content verification.
+   Leave an explicit note that the visual verification is pending on the user (do
+   not claim it done).
 
-## Procedimiento
+## Procedure
 
-### 1. Línea base de logs
+### 1. Log baseline
 
 ```bash
-BASE_LOG=$(wc -l < <log de la app> 2>/dev/null || echo 0)
+BASE_LOG=$(wc -l < <app log file> 2>/dev/null || echo 0)
 ```
 
-### 2. Arrancar la app real
+### 2. Start the real app
 
-**Con navegador integrado (preferido):** `preview_start` — usa la configuración de
-`.claude/launch.json` y abre la pestaña él solo. Guarda el `serverId` (para
-`preview_logs`/`preview_stop`) y el `tabId` del resultado. Si la app ya estaba
-arrancada de antes, `preview_start` reutiliza el servidor: recarga la página para
-partir de estado limpio. NO arranques la app con Bash en esta vía.
+**With the integrated browser (preferred):** `preview_start` — it uses the
+`.claude/launch.json` configuration and opens the tab by itself. Save the `serverId`
+(for `preview_logs`/`preview_stop`) and the `tabId` from the result. If the app was
+already running, `preview_start` reuses the server: reload the page to start from a
+clean state. Do NOT start the app with Bash on this path.
 
-**Fallback con Chrome real:** lánzala con Bash en background
+**Fallback with real Chrome:** launch it with Bash in the background
 (`run_in_background: true`):
 
 ```bash
-<comando de arranque>   # en un puerto libre dedicado a verificación
+<app start command>   # on a free port dedicated to verification
 ```
 
-y espera a que la salida indique que el servidor está listo. Si el puerto está
-ocupado, usa otro.
+and wait until the output indicates the server is ready. If the port is busy, use
+another one.
 
-**Criterio (ambas vías):** arranca sin traceback en <30s — compruébalo con
-`preview_logs` (nivel `error`) o con la salida del proceso en background.
+**Criterion (both paths):** it starts without a traceback in <30s — check it with
+`preview_logs` (level `error`) or the background process output.
 
-### 3. Recorrer las páginas con el navegador
+### 3. Walk the pages with the browser
 
-Con el navegador elegido, abre la app y recorre:
+With the chosen browser, open the app and walk:
 
-1. **La página principal**: se renderiza sin mensaje de excepción.
-2. **La página/pestaña afectada por el cambio de la sesión** — este es el paso
-   importante: **interactúa con el flujo cambiado, no solo lo mires**. Si el cambio fue
-   un botón/formulario, púlsalo/rellénalo y comprueba el estado resultante (¿el fichero
-   de datos esperado cambió? ¿la fila muestra el valor nuevo?); si fue un cálculo,
-   verifica un valor concreto contra el dato de origen.
-3. Un pase rápido por el resto de páginas para detectar roturas colaterales: cada una
-   carga sin excepción visible.
+1. **The main page**: it renders without an exception message.
+2. **The page/tab affected by the session's change** — this is the important step:
+   **interact with the changed flow, do not just look at it**. If the change was a
+   button/form, press/fill it and check the resulting state (did the expected data
+   file change? does the row show the new value?); if it was a computation, verify a
+   concrete value against the source data.
+3. A quick pass over the remaining pages to detect collateral breakage: each one
+   loads without a visible exception.
 
-Consejos con el navegador integrado: para verificar texto y estructura prefiere
-`read_page` (devuelve refs para `computer`/`form_input`) sobre screenshots; usa
-`computer` para clics/teclado y `read_console_messages` con `onlyErrors: true` para
-cazar errores JS del frontend.
+Tips with the integrated browser: to verify text and structure prefer `read_page`
+(returns refs for `computer`/`form_input`) over screenshots; use `computer` for
+clicks/keyboard and `read_console_messages` with `onlyErrors: true` to catch
+frontend JS errors.
 
-Haz **screenshot** de la página afectada como evidencia (acción `screenshot` de
-`computer` en cualquiera de las dos vías).
+Take a **screenshot** of the affected page as evidence (`screenshot` action of
+`computer` on either path).
 
-Precaución: si las páginas disparan llamadas a APIs externas, es normal que tarden;
-un fallo de red externo NO es un fallo del cambio (compruébalo en el log: esas rutas
-deben registrar warning y degradar sin romper).
+Caution: if the pages trigger external API calls, it is normal for them to take a
+while; an external network failure is NOT a failure of the change (check it in the
+log: those paths must log a warning and degrade without breaking).
 
-### 4. Comprobar logs y salida
+### 4. Check logs and output
 
 ```bash
-tail -n +$((BASE_LOG + 1)) <log de la app> | grep -nE "ERROR|Traceback" || echo "sin errores nuevos"
+tail -n +$((BASE_LOG + 1)) <app log file> | grep -nE "ERROR|Traceback" || echo "no new errors"
 ```
 
-**Criterio:** cero líneas `ERROR`/`Traceback` nuevas atribuibles al cambio (un warning
-de red externa documentado no cuenta). Revisa también la salida del proceso de la app:
-con navegador integrado, `preview_logs` con `level: "error"`; con Bash en background,
-la salida del proceso. Cero tracebacks.
+**Criterion:** zero new `ERROR`/`Traceback` lines attributable to the change (a
+documented external network warning does not count). Also review the app process
+output: with the integrated browser, `preview_logs` with `level: "error"`; with Bash
+in the background, the process output. Zero tracebacks.
 
-### 5. Parar la app
+### 5. Stop the app
 
-Con navegador integrado: `preview_stop` con el `serverId`. Con Bash: mata el proceso
-lanzado en el paso 2. No dejes procesos colgados.
+With the integrated browser: `preview_stop` with the `serverId`. With Bash: kill the
+process launched in step 2. Do not leave hanging processes.
 
-## Resultado
+## Result
 
-Reporta como una lista de checks con su resultado medido (arranque OK, página X
-renderiza, interacción Y produce Z, 0 errores nuevos en log), no como "todo funciona".
-Si algún check falla, la feature NO está lista para `done` ni para `./harness/close.sh`.
+Report as a list of checks with their measured result (startup OK, page X renders,
+interaction Y produces Z, 0 new errors in the log), not as "everything works". If
+any check fails, the feature is NOT ready for `done` or for `./harness/close.sh`.

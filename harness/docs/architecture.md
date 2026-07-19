@@ -1,35 +1,35 @@
-# Arquitectura
+# Architecture
 
-> **Plantilla** — este documento es la fuente de **detalle fino** del proyecto: se
-> rellena y se mantiene al implementar. `harness/check_docs.py` cruza los símbolos
-> públicos del diff de cada sesión contra este fichero (y `data-models.md` /
-> `CLAUDE.md`): toda función pública nueva debe quedar mencionada aquí.
+> **Template** — this document is the source of **fine detail** for the project: it is
+> filled in and maintained while implementing. `harness/check_docs.py` cross-checks
+> the public symbols of each session's diff against this file (and `data-models.md` /
+> `CLAUDE.md`): every new public function must end up mentioned here.
 
-## Decisiones de arquitectura (cerradas)
+## Architecture decisions (closed)
 
-_Lista de decisiones tomadas y cerradas, con su justificación en una o dos líneas.
-Ejemplos: stack elegido, persistencia, fuentes de datos externas, qué queda fuera
-del alcance. Las decisiones abiertas NO van aquí: van al backlog o a ideas._
-
-- ...
-
-## Mapa de módulos
-
-_Una sección por módulo de `core/` y `ui/`, con sus funciones públicas: firma breve,
-qué hace, qué lanza. Este es el nivel de detalle que NO va en `CLAUDE.md` (allí solo
-el mapa de una línea por módulo)._
-
-### core/<modulo>.py
-
-- `funcion_publica(arg) -> tipo` — qué hace, invariantes, excepciones.
-
-### ui/<pagina>.py
+_List of decisions taken and closed, with their rationale in one or two lines.
+Examples: chosen stack, persistence, external data sources, what is out of scope.
+Open decisions do NOT go here: they go to the backlog or to ideas._
 
 - ...
 
-## Hallazgos verificados en vivo
+## Module map
 
-_Comportamientos de APIs externas, series de datos, límites o rarezas comprobadas
-empíricamente durante el desarrollo. Evita re-descubrirlos en cada sesión._
+_One section per `core/` and `ui/` module, with its public functions: brief signature,
+what it does, what it raises. This is the level of detail that does NOT go in
+`CLAUDE.md` (there, only the one-line map per module)._
+
+### core/<module>.py
+
+- `public_function(arg) -> type` — what it does, invariants, exceptions.
+
+### ui/<page>.py
+
+- ...
+
+## Findings verified live
+
+_Behaviors of external APIs, data series, limits or quirks verified empirically
+during development. Avoids re-discovering them every session._
 
 - ...

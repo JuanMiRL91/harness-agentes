@@ -1,20 +1,19 @@
-# IDEAS — cuaderno personal de implementaciones futuras
+# IDEAS — personal notebook of future implementations
 
-> Documento **personal del usuario**. Aquí anoto, con mis palabras, ideas de
-> implementaciones futuras que aún quiero madurar antes de convertirlas en tareas.
+> **Personal document of the user.** Here I jot down, in my own words, ideas for
+> future implementations that I still want to mature before turning them into tasks.
 >
-> **Regla para agentes de IA:** este fichero NO se edita, ni se reescribe, ni se
-> "mejora" — ni siquiera el formato. Solo se lee cuando yo pida explícitamente
-> analizarlo para convertir alguna idea en features de `harness/feature_list.json`
-> (vía `/add-feature`). Hasta entonces, nada de lo escrito aquí es accionable.
+> **Rule for AI agents:** this file is NOT edited, rewritten or "improved" — not even
+> its formatting. It is only read when I explicitly ask to analyze it to convert an
+> idea into `harness/feature_list.json` features (via `/add-feature`). Until then,
+> nothing written here is actionable.
 >
-> Formato: una idea por bloque, separadas por `---`, cada una con un título `##`
-> y una descripción libre (es lo que renderiza la pestaña Ideas de
-> `harness/viewer.py`).
+> Format: one idea per block, separated by `---`, each with a `##` title and a free
+> description (this is what the Ideas tab of `harness/viewer.py` renders).
 
 ---
 
-## Idea de ejemplo (borrar al adoptar el harness)
-Descripción libre de la idea, en las palabras del usuario. Sin criterios de
-aceptación ni detalle técnico: eso llega después, si la idea madura y se
-convierte en feature con `/add-feature`.
+## Example idea (delete when adopting the harness)
+Free-form description of the idea, in the user's words. No acceptance criteria and no
+technical detail: that comes later, if the idea matures and becomes a feature via
+`/add-feature`.

@@ -1,43 +1,43 @@
-# CHECKPOINTS — Evaluación del estado final
+# CHECKPOINTS — Final-state evaluation
 
-Cinco checkpoints objetivos. El agente revisor los valida antes de cerrar cualquier sesión.
-
----
-
-## C1 — Harness completo
-
-- [ ] Existen: `AGENTS.md`, `harness/init.sh`, `harness/feature_list.json`, `harness/feature_list_archive.json`, `harness/progress/current.md`, `harness/progress/history.md`
-- [ ] Existen: `harness/docs/architecture.md`, `harness/docs/data-models.md`, `harness/docs/conventions.md`, `harness/docs/verification.md`
-- [ ] `CLAUDE.md` tiene 40.000 caracteres o menos (el detalle vive en `harness/docs/`)
-- [ ] `./harness/init.sh` ejecuta sin errores
-
-## C2 — Estado coherente
-
-- [ ] Solo una feature en `in_progress` (o ninguna)
-- [ ] `feature_list_archive.json` contiene solo `done`/`Cancelled`, sin ids duplicados con el activo (`init.sh` §3 lo valida)
-- [ ] Las features `done` tienen tests que pasan
-- [ ] `harness/progress/current.md` contiene solo la sesión activa (no acumulación de sesiones anteriores)
-
-## C3 — Cumplimiento arquitectónico
-
-- [ ] `core/` contiene solo los módulos documentados en `harness/docs/architecture.md`
-- [ ] La UI (`ui/`) no contiene lógica de negocio
-- [ ] No hay dependencias externas no documentadas en `requirements.txt`
-- [ ] Sin código de debug (`print()` residuales, TODOs sin contexto)
-
-## C4 — Verificación genuina
-
-- [ ] Cada módulo de `core/` tiene al menos un test en `tests/`
-- [ ] Los tests usan directorios temporales reales (no mocks del filesystem)
-- [ ] `python -m pytest tests/` termina en verde
-
-## C5 — Cierre de sesión correcto
-
-- [ ] Sin archivos temporales sin rastrear en git
-- [ ] La sesión está documentada en `harness/progress/history.md`
-- [ ] Los estados de features en `harness/feature_list.json` reflejan el trabajo real completado
-- [ ] `./harness/close.sh` ejecutado con éxito (commit automático realizado)
+Five objective checkpoints. The reviewing agent validates them before closing any session.
 
 ---
 
-Un revisor valida cada checkpoint sistemáticamente. Si alguno falla, la sesión no se cierra.
+## C1 — Complete harness
+
+- [ ] These exist: `AGENTS.md`, `harness/init.sh`, `harness/feature_list.json`, `harness/feature_list_archive.json`, `harness/progress/current.md`, `harness/progress/history.md`
+- [ ] These exist: `harness/docs/architecture.md`, `harness/docs/data-models.md`, `harness/docs/conventions.md`, `harness/docs/verification.md`
+- [ ] `CLAUDE.md` is 40,000 characters or fewer (the detail lives in `harness/docs/`)
+- [ ] `./harness/init.sh` runs without errors
+
+## C2 — Coherent state
+
+- [ ] Only one feature `in_progress` (or none)
+- [ ] `feature_list_archive.json` contains only `done`/`Cancelled`, with no ids duplicated with the active file (`init.sh` §3 validates it)
+- [ ] `done` features have passing tests
+- [ ] `harness/progress/current.md` contains only the active session (no accumulation of previous sessions)
+
+## C3 — Architectural compliance
+
+- [ ] `core/` contains only the modules documented in `harness/docs/architecture.md`
+- [ ] The UI (`ui/`) contains no business logic
+- [ ] No external dependencies undeclared in `requirements.txt`
+- [ ] No debug code (leftover `print()`, context-less TODOs)
+
+## C4 — Genuine verification
+
+- [ ] Every `core/` module has at least one test in `tests/`
+- [ ] Tests use real temporary directories (no filesystem mocks)
+- [ ] `python -m pytest tests/` finishes green
+
+## C5 — Correct session close
+
+- [ ] No untracked temporary files in git
+- [ ] The session is documented in `harness/progress/history.md`
+- [ ] Feature states in `harness/feature_list.json` reflect the work actually completed
+- [ ] `./harness/close.sh` executed successfully (automatic commit made)
+
+---
+
+A reviewer validates each checkpoint systematically. If any fails, the session does not close.

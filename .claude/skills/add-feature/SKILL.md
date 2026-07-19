@@ -1,77 +1,78 @@
 ---
 name: add-feature
-description: Añadir una o varias tareas nuevas al backlog del harness (harness/feature_list.json) del proyecto, en estado "pending" y con las convenciones del repo. Úsala cuando el usuario pida "añadir feature/tarea", "nueva feature", o describa implementaciones para registrar en el backlog (no para implementarlas).
+description: Add one or several new tasks to the harness backlog (harness/feature_list.json) of the project, in "pending" status and following the repo conventions. Use it when the user asks to "add a feature/task", "new feature", or describes implementations to register in the backlog (not to implement them).
 ---
 
-# Añadir features a `harness/feature_list.json`
+# Adding features to `harness/feature_list.json`
 
-Registra tareas nuevas en el backlog del harness de agentes. **No implementa** las features: solo
-las planifica y las añade en estado `"pending"` para que un agente las recoja después (regla
-`one_feature_at_a_time`). Una entrada por cada implementación que indique el usuario, salvo que pida
-agruparlas.
+Registers new tasks in the agent harness backlog. It does **not implement** the
+features: it only plans them and adds them in `"pending"` status so an agent picks
+them up later (`one_feature_at_a_time` rule). One entry per implementation the user
+states, unless they ask to group them.
 
-## Fichero y esquema
+## File and schema
 
-`harness/feature_list.json` (raíz del repo). Array `features` de objetos planos con **exactamente** estos
-campos (indentación de 2 espacios). Las tareas cerradas NO están aquí: `close.sh` las mueve a
-`harness/feature_list_archive.json` (mismo esquema, solo `done`/`Cancelled`); los ids son **globales**
-entre ambos ficheros:
+`harness/feature_list.json` (repo root). Array `features` of flat objects with
+**exactly** these fields (2-space indentation). Closed tasks are NOT here: `close.sh`
+moves them to `harness/feature_list_archive.json` (same schema, only
+`done`/`Cancelled`); ids are **global** across both files:
 
 ```jsonc
 {
-  "id": 32,                       // entero, secuencial = (max id actual) + 1, +1 por cada feature
-  "name": "ui_pagina_algo",        // snake_case, prefijo por área (ver convenciones)
-  "title": "Título en español",   // corto, descriptivo
-  "description": "Qué y por qué. Referencia ficheros/funciones concretos. Para bugs, pega el traceback. Termina SIEMPRE con una línea 'Verificación E2E: sí — <páginas a recorrer>' o 'Verificación E2E: no — <motivo>' (ver convenciones).",
-  "acceptance": [                 // criterios verificables Y auto-comprobables (ver convenciones)
-    "tests/test_storage.py cubre que guardar_config persiste la clave nueva (pytest tests/test_storage.py -k config)",
-    "UI: en la página afectada, el botón muestra 'Guardar' — verificable con la skill verify"
+  "id": 32,                       // integer, sequential = (current max id) + 1, +1 per feature
+  "name": "ui_page_something",    // snake_case, area prefix (see conventions)
+  "title": "Short descriptive title",
+  "description": "What and why. Reference concrete files/functions. For bugs, paste the traceback. ALWAYS end with a line 'E2E verification: yes — <pages to walk>' or 'E2E verification: no — <reason>' (see conventions).",
+  "acceptance": [                 // verifiable AND self-checkable criteria (see conventions)
+    "tests/test_storage.py covers that save_config persists the new key (pytest tests/test_storage.py -k config)",
+    "UI: on the affected page, the button shows 'Save' — verifiable with the verify skill"
   ],
-  "status": "pending"             // SIEMPRE pending al crear (nunca in_progress)
+  "status": "pending"             // ALWAYS pending on creation (never in_progress)
 }
 ```
 
-No añadas campos extra (no hay `priority`, `dependencies`, `category`...). Las dependencias se
-explican en prosa dentro de `description`.
+Do not add extra fields (there is no `priority`, `dependencies`, `category`...).
+Dependencies are explained in prose inside `description`.
 
-## Convenciones
+## Conventions
 
-- **`id`**: secuencial, nunca se reutiliza ni se renumera. El siguiente = max entre
-  `feature_list.json` **y** `feature_list_archive.json` + 1.
-- **`name`** (snake_case, en inglés) por prefijo de área:
-  - `core_*` → núcleo (`core/…`)  ·  `ui_*` → UI (`ui/…`)
-  - `harness_*` → infraestructura de desarrollo (`harness/…`)
-  - `BUG_*` → bug. **Para registrar un bug usa la skill `add-bug`** (aplica el prefijo
-    `BUG_` y lo prioriza en `AGENTS.md`); no registres bugs desde aquí.
-  - refactor → verbo (`reorganizar_…`, `deduplicar_…`)
-  - La lista no es cerrada: si surge un área nueva, usa un prefijo corto coherente con estos.
-- **Idioma**: `title`/`description`/`acceptance` en español; nombres de código, claves y ficheros en inglés.
-- **`acceptance`**: específico, verificable y **auto-comprobable**: cada criterio debe indicar
-  CÓMO se comprueba, no solo qué debe cumplirse, para que un agente pueda verificarlo sin
-  intervención humana (p.ej. como condición de salida de un loop `/goal`). Tres formas válidas:
-  - un test concreto con su comando (`pytest tests/test_X.py -k caso`);
-  - un comando/script cuya salida esperada se indica;
-  - un paso de UI observable, prefijado `UI:`, describiendo página/acción/resultado —
-    verificable con la skill `verify` (arranca la app real y recorre el flujo).
-  Evita criterios vagos ("funciona bien") y criterios sin método de comprobación.
-- **Verificación E2E (skill `verify`)**: la última línea de `description` declara si la
-  tarea requiere la verificación E2E con la app real al cerrarla (es la skill más cara en
-  tokens; solo se ejecuta justo antes de `./harness/close.sh` o por petición explícita
-  del usuario, nunca en el init):
-  - `Verificación E2E: sí — <páginas/pestañas a recorrer>` cuando la feature añade o
-    cambia un flujo de UI, un cálculo que la UI muestra, o toca `core/` con impacto
-    visible en alguna página.
-  - `Verificación E2E: no — <motivo>` para cambios pequeños sin flujo de UI nuevo:
-    solo `harness/`/`tests/`/docs, refactors internos sin cambio de comportamiento,
-    ajustes de estilo/texto triviales cubiertos por un test.
-  En caso de duda, `sí`. Si es `no`, los criterios de `acceptance` no deben incluir
-  pasos `UI:` (serían incoherentes).
-- **`status`** ∈ `pending | in_progress | done | blocked | Postponed | Cancelled`. Al crear: **siempre `pending`**.
+- **`id`**: sequential, never reused or renumbered. The next one = max across
+  `feature_list.json` **and** `feature_list_archive.json` + 1.
+- **`name`** (snake_case, in English) by area prefix:
+  - `core_*` → core (`core/…`)  ·  `ui_*` → UI (`ui/…`)
+  - `harness_*` → development infrastructure (`harness/…`)
+  - `BUG_*` → bug. **To register a bug use the `add-bug` skill** (it applies the
+    `BUG_` prefix and prioritizes it in `AGENTS.md`); do not register bugs from here.
+  - refactor → verb (`reorganize_…`, `deduplicate_…`)
+  - The list is not closed: if a new area appears, use a short prefix consistent with these.
+- **Language**: everything in English — `title`/`description`/`acceptance`, code
+  names, keys and files.
+- **`acceptance`**: specific, verifiable and **self-checkable**: each criterion must
+  state HOW it is checked, not only what must hold, so an agent can verify it without
+  human intervention (e.g. as the exit condition of a `/goal` loop). Three valid forms:
+  - a concrete test with its command (`pytest tests/test_X.py -k case`);
+  - a command/script whose expected output is stated;
+  - an observable UI step, prefixed `UI:`, describing page/action/result —
+    verifiable with the `verify` skill (starts the real app and walks the flow).
+  Avoid vague criteria ("works well") and criteria without a verification method.
+- **E2E verification (`verify` skill)**: the last line of `description` declares
+  whether the task requires E2E verification with the real app on close (it is the
+  most token-expensive skill in the harness; it only runs right before
+  `./harness/close.sh` or on explicit user request, never in the init):
+  - `E2E verification: yes — <pages/tabs to walk>` when the feature adds or changes
+    a UI flow, a computation the UI displays, or touches `core/` with visible impact
+    on some page.
+  - `E2E verification: no — <reason>` for small changes with no new UI flow:
+    only `harness/`/`tests/`/docs, internal refactors with no behavior change,
+    trivial style/text tweaks covered by a test.
+  When in doubt, `yes`. If it is `no`, the `acceptance` criteria must not include
+  `UI:` steps (they would be incoherent).
+- **`status`** ∈ `pending | in_progress | done | blocked | Postponed | Cancelled`. On creation: **always `pending`**.
 
-## Flujo de trabajo
+## Workflow
 
-1. **Entender la petición.** Si el usuario lista varias implementaciones, normalmente = una feature por punto.
-2. **Leer el backlog pendiente** (no solo el código actual):
+1. **Understand the request.** If the user lists several implementations, usually = one feature per item.
+2. **Read the pending backlog** (not only the current code):
    ```bash
    python3 -c "
    import json
@@ -79,24 +80,26 @@ explican en prosa dentro de `description`.
        if f['status'] == 'pending': print(f['id'], f['name'], '·', f['title'])
    "
    ```
-   Con dos objetivos:
-   - **Evitar duplicados**: si una tarea `pending` ya cubre (total o parcialmente) lo pedido,
-     díselo al usuario en vez de duplicarla.
-   - **Usarlas como contexto de diseño**: si una tarea `pending` va a cambiar la estructura o
-     el comportamiento del área afectada (esquema de datos, layout de carpetas/UI, firma o
-     ubicación de una función…), redacta la nueva feature **contando con ese cambio futuro**,
-     no solo contra el código de hoy, y deja la relación explícita en `description`
-     (p. ej. "asume que #NN ya habrá dividido pendientes.py en dos secciones"). Lee la
-     `description` completa de las pendientes que toquen la misma área, no solo el título.
-3. **Decisiones de diseño primero.** Si una feature implica una elección no trivial (dónde guardar
-   datos, comportamiento de UI, fuente de datos, alcance...), usa **AskUserQuestion ANTES de redactar**,
-   ofreciendo una recomendación como primera opción. No inventes el enfoque.
-4. **Explorar lo justo.** Para referenciar bien ficheros/funciones en `description`/`acceptance`,
-   consulta el **"Mapa de módulos"** de `harness/docs/architecture.md` (los esquemas JSON
-   están en `harness/docs/data-models.md`) y, si hace falta precisión, lee el fichero
-   concreto (un módulo de `ui/` o `core/`). No re-explores todo el repo para tareas claras.
-5. **Calcular el siguiente id** (no asumas, y hazlo **justo antes de escribir**: otra sesión o
-   job en paralelo puede haber añadido entradas desde que abriste el fichero):
+   With two goals:
+   - **Avoid duplicates**: if a `pending` task already covers (fully or partially)
+     what is asked, tell the user instead of duplicating it.
+   - **Use them as design context**: if a `pending` task is going to change the
+     structure or behavior of the affected area (data schema, folder/UI layout,
+     signature or location of a function…), write the new feature **accounting for
+     that future change**, not only against today's code, and make the relation
+     explicit in `description` (e.g. "assumes #NN will already have split page X in
+     two sections"). Read the full `description` of the pending tasks touching the
+     same area, not just the title.
+3. **Design decisions first.** If a feature implies a non-trivial choice (where to
+   store data, UI behavior, data source, scope...), use **AskUserQuestion BEFORE
+   writing**, offering a recommendation as the first option. Do not invent the approach.
+4. **Explore just enough.** To reference files/functions correctly in
+   `description`/`acceptance`, consult the **"Module map"** of
+   `harness/docs/architecture.md` (data schemas are in `harness/docs/data-models.md`)
+   and, if precision is needed, read the concrete file (a `ui/` or `core/` module).
+   Do not re-explore the whole repo for clear tasks.
+5. **Compute the next id** (do not assume, and do it **right before writing**:
+   another session or parallel job may have added entries since you opened the file):
    ```bash
    python3 -c "
    import json
@@ -109,36 +112,36 @@ explican en prosa dentro de `description`.
    print(mx + 1)
    "
    ```
-6. **Redactar y añadir** las entradas justo antes del `]` de cierre del array `features`, con id
-   consecutivo, `status: "pending"`, y respetando el esquema/indentación.
-7. **Validar** (ver más abajo).
-8. **Resumir** al usuario la tabla `id · name · título`. **No** commitear salvo que lo pida; **no**
-   marcar `in_progress`; **no** implementar la feature.
+6. **Write and add** the entries right before the closing `]` of the `features`
+   array, with consecutive ids, `status: "pending"`, respecting the schema/indentation.
+7. **Validate** (see below).
+8. **Summarize** to the user the `id · name · title` table. Do **not** commit unless
+   asked; do **not** mark `in_progress`; do **not** implement the feature.
 
-## Verificación
+## Verification
 
 ```bash
 python3 -c "
 import json
-d = json.load(open('harness/feature_list.json'))           # parsea sin error
+d = json.load(open('harness/feature_list.json'))           # parses without error
 fs = d['features']; valid = set(d['rules']['valid_status'])
 try:
     arch = json.load(open('harness/feature_list_archive.json'))['features']
 except FileNotFoundError:
     arch = []
 ids = [f['id'] for f in fs] + [f['id'] for f in arch]
-assert len(ids) == len(set(ids)), 'ids duplicados (archivo incluido)'
+assert len(ids) == len(set(ids)), 'duplicated ids (archive included)'
 for f in fs:
-    assert f['status'] in valid, f'status invalido en {f[\"id\"]}'
-    assert set(f) == {'id','name','title','description','acceptance','status'}, f'campos raros en {f[\"id\"]}'
-print('OK:', len(fs), 'activas ·', len(arch), 'archivadas')
+    assert f['status'] in valid, f'invalid status in {f[\"id\"]}'
+    assert set(f) == {'id','name','title','description','acceptance','status'}, f'odd fields in {f[\"id\"]}'
+print('OK:', len(fs), 'active ·', len(arch), 'archived')
 "
-git diff harness/feature_list.json   # solo entradas añadidas antes del ] final; resto intacto
+git diff harness/feature_list.json   # only entries added before the final ]; rest intact
 ```
 
-## Qué NO hacer
+## What NOT to do
 
-- No marcar `done`/`in_progress` ni implementar el código de la feature.
-- No commitear ni hacer push salvo petición explícita.
-- No añadir campos fuera del esquema ni cambiar las `rules`.
-- No tocar entradas existentes (ids inmutables).
+- Do not mark `done`/`in_progress` or implement the feature's code.
+- Do not commit or push unless explicitly asked.
+- Do not add fields outside the schema or change the `rules`.
+- Do not touch existing entries (immutable ids).

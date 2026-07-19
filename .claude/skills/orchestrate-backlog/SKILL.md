@@ -1,29 +1,29 @@
 ---
 name: orchestrate-backlog
-description: Orquestar el vaciado del backlog del proyecto (harness/feature_list.json) delegando cada tarea pending en subagentes Haiku/Sonnet secuenciales y agrupando la verificación E2E (skill verify) en UNA sola pasada final, para minimizar tokens y no agotar el límite de 5 horas. Úsala SIEMPRE que el usuario pida "dejar las features pending en done", "vaciar/procesar el backlog", "ve ejecutando agentes con las features", un /goal sobre varias tareas de feature_list.json, o cualquier petición de trabajar más de una tarea del backlog en la misma sesión — aunque no mencione la palabra "orquestar".
+description: Orchestrate draining the project backlog (harness/feature_list.json) by delegating each pending task to sequential Haiku/Sonnet subagents and batching the E2E verification (verify skill) into ONE final pass, to minimize tokens and not exhaust the 5-hour limit. Use it WHENEVER the user asks to "get the pending features to done", "drain/process the backlog", "run agents through the features", a /goal over several feature_list.json tasks, or any request to work on more than one backlog task in the same session — even if the word "orchestrate" is not mentioned.
 ---
 
-# Orquestar el backlog con subagentes
+# Orchestrating the backlog with subagents
 
-El chat principal (modelo frontier) actúa SOLO como orquestador: planifica, delega,
-supervisa y verifica al final. **Nunca implementa código él mismo** — cada línea de
-implementación que escribe el orquestador es el uso más caro posible de tokens. Los
-tres sumideros de tokens que esta skill elimina:
+The main chat (frontier model) acts ONLY as orchestrator: it plans, delegates,
+supervises and verifies at the end. **It never implements code itself** — every line
+of implementation the orchestrator writes is the most expensive possible use of
+tokens. The three token sinks this skill eliminates:
 
-1. **Un `/verify` por feature.** La skill `verify` (app real + navegador) es la más
-   cara del harness. Si varias features tocan las mismas páginas, una sola pasada
-   agrupada al final las cubre todas.
-2. **Un `/code-review` por feature.** Un subagente revisándose a sí mismo con su propio
-   contexto aporta poco: la revisión va agrupada al final, una sola pasada con contexto
-   fresco sobre el diff completo del lote.
-3. **Cada subagente re-derivando el protocolo.** El protocolo de implementación vive en
-   el agente **`implementer`** (`.claude/agents/implementer.md`), no en el prompt: a
-   cada subagente solo se le pasa la entrada JSON literal de su tarea.
+1. **One `/verify` per feature.** The `verify` skill (real app + browser) is the most
+   expensive one in the harness. If several features touch the same pages, a single
+   batched pass at the end covers them all.
+2. **One `/code-review` per feature.** A subagent reviewing itself with its own
+   context adds little: the review is batched at the end, a single pass with fresh
+   context over the whole batch diff.
+3. **Each subagent re-deriving the protocol.** The implementation protocol lives in
+   the **`implementer`** agent (`.claude/agents/implementer.md`), not in the prompt:
+   each subagent only receives the literal JSON entry of its task.
 
-## Fase 1 — Inventario y plan (orquestador, una sola vez)
+## Phase 1 — Inventory and plan (orchestrator, once)
 
-1. `./harness/init.sh` — si falla, para y resuélvelo antes de delegar nada.
-2. Lista las `pending` ordenadas (bugs `BUG_` primero por id, luego features por id):
+1. `./harness/init.sh` — if it fails, stop and fix it before delegating anything.
+2. List the `pending` tasks sorted (`BUG_` bugs first by id, then features by id):
 
    ```bash
    python3 -c "
@@ -34,50 +34,51 @@ tres sumideros de tokens que esta skill elimina:
    "
    ```
 
-   (Las cerradas viven en `harness/feature_list_archive.json`; las pending, siempre en
-   el fichero activo.)
+   (Closed tasks live in `harness/feature_list_archive.json`; pending ones, always in
+   the active file.)
 
-3. Lee la entrada completa de cada pending (una vez; guárdalas para los prompts) y
-   clasifícalas en un plan con tres columnas por tarea:
-   - **Modelo:** `haiku` solo para cambios mecánicos (cambiar un default, renombrar,
-     borrar un bloque delimitado, criterios verificables con grep); `sonnet` para todo
-     lo demás (lógica en `core/`, UI nueva, tests con casos límite). El frontier no
-     implementa nunca.
-   - **E2E:** `sí`/`no` según la línea `Verificación E2E:` de la `description`; si no
-     existe, `sí` cuando hay criterios `UI:` en `acceptance` o toca `core/`/`ui/`
-     (criterio por defecto de la skill `verify`).
-   - **Grupo de verify:** las páginas/pestañas a recorrer (de la línea E2E o de los
-     pasos `UI:`). Tareas con páginas comunes comparten grupo.
-4. Crea/actualiza `harness/progress/orchestrator.md` con el plan, una línea
-   `Base del lote: <hash de git rev-parse HEAD>` (ancla del review agrupado de la
-   Fase 3) y una sección `## Verify diferido` vacía. Este fichero es el estado
-   persistente de la orquestación: si la sesión muere (límite de 5h, cierre), la
-   siguiente invocación de esta skill lo lee y continúa donde quedó. Muéstrale el plan
-   al usuario en una tabla corta antes de empezar (no pidas confirmación: la invocación
-   de la skill ya es la orden).
+3. Read the full entry of each pending task (once; keep them for the prompts) and
+   classify them into a plan with three columns per task:
+   - **Model:** `haiku` only for mechanical changes (changing a default, renaming,
+     deleting a delimited block, grep-verifiable criteria); `sonnet` for everything
+     else (`core/` logic, new UI, tests with edge cases). The frontier model never
+     implements.
+   - **E2E:** `yes`/`no` per the `E2E verification:` line of the `description`; if
+     absent, `yes` when there are `UI:` criteria in `acceptance` or it touches
+     `core/`/`ui/` (the `verify` skill's default criterion).
+   - **Verify group:** the pages/tabs to walk (from the E2E line or the `UI:` steps).
+     Tasks with common pages share a group.
+4. Create/update `harness/progress/orchestrator.md` with the plan, a line
+   `Batch base: <hash from git rev-parse HEAD>` (anchor for Phase 3's batched review)
+   and an empty `## Deferred verify` section. This file is the orchestration's
+   persistent state: if the session dies (5h limit, close), the next invocation of
+   this skill reads it and continues where it left off. Show the plan to the user in
+   a short table before starting (do not ask for confirmation: invoking the skill is
+   the order).
 
-## Fase 2 — Un subagente por tarea (secuencial, nunca en paralelo)
+## Phase 2 — One subagent per task (sequential, never in parallel)
 
-Las tareas comparten ficheros (`feature_list.json`, `current.md`, git) y la regla del
-repo es una feature a la vez: lanza los subagentes **de uno en uno** y espera el
-resultado (`run_in_background: false`).
+Tasks share files (`feature_list.json`, `current.md`, git) and the repo rule is one
+feature at a time: launch the subagents **one by one** and wait for the result
+(`run_in_background: false`).
 
-Lanza cada tarea con el agente **`implementer`** — su protocolo completo vive en
-`.claude/agents/implementer.md`, NO lo dupliques en el prompt — pasando el `model` del
-plan (`haiku` mecánicas · `sonnet` el resto). Prompt mínimo:
+Launch each task with the **`implementer`** agent — its full protocol lives in
+`.claude/agents/implementer.md`, do NOT duplicate it in the prompt — passing the
+plan's `model` (`haiku` mechanical · `sonnet` the rest). Minimal prompt:
 
 ```
-TAREA (harness/feature_list.json):
-<entrada JSON completa, literal>
+TASK (harness/feature_list.json):
+<full JSON entry, literal>
 ```
 
-más, solo si aplica, 1-3 líneas de contexto específico (relación con otra tarea del
-lote, decisión ya tomada por el usuario).
+plus, only if applicable, 1-3 lines of specific context (relation to another task in
+the batch, a decision already made by the user).
 
-Tras cada subagente, el orquestador (barato, sin releer ficheros grandes):
+After each subagent, the orchestrator (cheap, without re-reading large files):
 
-- Confirma el commit: `git log --oneline -1` contiene `(#<id>)`; y el status `done` con
-  un one-liner (OJO: close.sh archiva la entrada al cerrar — búscala en ambos ficheros):
+- Confirms the commit: `git log --oneline -1` contains `(#<id>)`; and the `done`
+  status with a one-liner (NOTE: close.sh archives the entry on close — look for it
+  in both files):
 
   ```bash
   python3 -c "
@@ -89,74 +90,76 @@ Tras cada subagente, el orquestador (barato, sin releer ficheros grandes):
   "
   ```
 
-- **Escalera de reintentos** si no hay commit o el status no es `done`:
-  1. Relanza UNA vez el mismo subagente vía SendMessage con el error concreto
-     (conserva su contexto).
-  2. Si vuelve a fallar, lanza un `implementer` NUEVO con el modelo un nivel por
-     encima (`haiku`→`sonnet`, `sonnet`→`opus`); prompt = entrada JSON + resumen de qué
-     se intentó y qué error dio (contexto limpio: no arrastres el transcript).
-  3. Si también falla, marca la tarea `blocked` en el plan de `orchestrator.md` y sigue
-     con la siguiente (no la arregles tú en el chat principal salvo que sea trivial).
-- Añade los criterios `UI:` de la tarea a `## Verify diferido` de `orchestrator.md`.
-- No arrastres el chat: tu estado son 3-4 líneas por tarea (el State Summary), no el
-  transcript del subagente.
+- **Retry ladder** if there is no commit or the status is not `done`:
+  1. Relaunch the same subagent ONCE via SendMessage with the concrete error
+     (keeps its context).
+  2. If it fails again, launch a NEW `implementer` with the model one level up
+     (`haiku`→`sonnet`, `sonnet`→`opus`); prompt = JSON entry + summary of what was
+     tried and what error it gave (clean context: do not drag the transcript along).
+  3. If that also fails, mark the task `blocked` in `orchestrator.md`'s plan and move
+     on to the next (do not fix it yourself in the main chat unless it is trivial).
+- Add the task's `UI:` criteria to `## Deferred verify` in `orchestrator.md`.
+- Do not drag the chat along: your state is 3-4 lines per task (the State Summary),
+  not the subagent's transcript.
 
-## Fase 3 — Review y verify agrupados (una sola vez, al final)
+## Phase 3 — Batched review and verify (once, at the end)
 
-Cuando no queden pending (o al reanudar una orquestación con `## Verify diferido` no
-vacío):
+When no pending tasks remain (or when resuming an orchestration with a non-empty
+`## Deferred verify`):
 
-1. **Review agrupado:** pasa la skill `code-review` (effort medium) UNA vez sobre el
-   diff completo del lote (`git diff <Base del lote>..HEAD`; el hash está en
-   `orchestrator.md`). Hallazgos confirmados → regístralos como `BUG_` (convenciones de
-   la skill `add-bug`) y ciérralos con subagentes `implementer` (sonnet) por el
-   protocolo de la Fase 2. Una sola pasada de review por orquestación: los commits de
-   estos fixes NO re-disparan otro review.
-2. **Verify agrupado:** ejecuta la skill `verify` UNA vez sobre la **unión** de
-   páginas/pestañas de `## Verify diferido`, comprobando explícitamente cada criterio
-   `UI:` diferido (no un paseo genérico: cada criterio, su resultado medido). Va
-   después del review para cubrir también sus fixes.
-3. Si todo pasa: vacía `orchestrator.md` (déjalo con el header y "_sin orquestación
-   activa_") y commitea ese cierre como `chore: verify agrupado de #N..#M` (aquí sí,
-   commit directo — no hay feature que cerrar).
-4. Si el verify falla algo: los commits de las features ya existen — se arregla hacia
-   delante. Registra el fallo como `BUG_` (convenciones de la skill `add-bug`), lanza
-   un `implementer` (sonnet) para el fix con el protocolo de la Fase 2, y repite el
-   check fallido. No repitas la pasada entera si el resto de criterios ya pasaron.
+1. **Batched review:** run the `code-review` skill (effort medium) ONCE over the
+   whole batch diff (`git diff <Batch base>..HEAD`; the hash is in
+   `orchestrator.md`). Confirmed findings → register them as `BUG_` (conventions of
+   the `add-bug` skill) and close them with `implementer` subagents (sonnet) via the
+   Phase 2 protocol. A single review pass per orchestration: the commits of these
+   fixes do NOT re-trigger another review.
+2. **Batched verify:** run the `verify` skill ONCE over the **union** of pages/tabs
+   in `## Deferred verify`, explicitly checking each deferred `UI:` criterion (not a
+   generic walkthrough: each criterion, its measured result). It goes after the
+   review to also cover its fixes.
+3. If everything passes: empty `orchestrator.md` (leave it with the header and
+   "_no active orchestration_") and commit that close as
+   `chore: batched verify of #N..#M` (here yes, a direct commit — there is no feature
+   to close).
+4. If the verify fails something: the features' commits already exist — fix forward.
+   Register the failure as `BUG_` (conventions of the `add-bug` skill), launch an
+   `implementer` (sonnet) for the fix via the Phase 2 protocol, and repeat the failed
+   check. Do not repeat the whole pass if the other criteria already passed.
 
-## Límite de 5 horas — reanudación
+## 5-hour limit — resumption
 
-El diseño ya es tolerante a cortes: `feature_list.json` (status), git (commits por
-feature) y `orchestrator.md` (plan + verify diferido) reconstruyen el estado
-completo; reanudar = volver a invocar esta skill.
+The design is already cut-tolerant: `feature_list.json` (status), git (commits per
+feature) and `orchestrator.md` (plan + deferred verify) reconstruct the full state;
+resuming = invoking this skill again.
 
-No hay forma fiable de leer el % de uso desde dentro de la sesión: no lo chequees
-ni lo estimes. Los únicos disparadores válidos son que **el usuario avise**
-("límite al 90%", "se ha agotado, se resetea a las 18:00") o que **un turno falle
-por rate limit** con hora de reset visible. En ese caso:
+There is no reliable way to read the usage % from inside the session: do not check
+or estimate it. The only valid triggers are that **the user warns** ("limit at 90%",
+"it ran out, resets at 18:00") or that **a turn fails due to rate limit** with a
+visible reset time. In that case:
 
-- **No lances más subagentes**: una feature a medias con el límite agotado deja el
-  repo sucio. Deja `orchestrator.md` al día.
-- Programa la reanudación con **CronCreate**: un cron **one-shot** a la hora de
-  reset **+5 min de margen**, con el prompt: "Invoca la skill orchestrate-backlog
-  y reanuda la orquestación desde harness/progress/orchestrator.md". Confírmale al
-  usuario la hora programada y que la sesión debe seguir abierta (los crons
-  one-shot solo disparan con la sesión viva o reanudada con --resume/--continue;
-  caducan a los 7 días). Si CronCreate no está disponible, dilo y pide al usuario
-  que reabra el chat con esa misma frase tras el reset.
-- Tras reanudar, borra el cron si sigue listado (CronDelete) y continúa la Fase 2.
+- **Do not launch more subagents**: a half-done feature with the limit exhausted
+  leaves the repo dirty. Leave `orchestrator.md` up to date.
+- Schedule the resumption with **CronCreate**: a **one-shot** cron at the reset time
+  **+5 min margin**, with the prompt: "Invoke the orchestrate-backlog skill and
+  resume the orchestration from harness/progress/orchestrator.md". Confirm to the
+  user the scheduled time and that the session must stay open (one-shot crons only
+  fire with the session alive or resumed with --resume/--continue; they expire after
+  7 days). If CronCreate is not available, say so and ask the user to reopen the
+  chat with that same sentence after the reset.
+- After resuming, delete the cron if it is still listed (CronDelete) and continue
+  Phase 2.
 
-No programes crons periódicos "por si acaso": quemarían turnos del límite nuevo.
+Do not schedule periodic crons "just in case": they would burn turns of the new limit.
 
-## Qué NO hacer
+## What NOT to do
 
-- No implementar código en el chat principal (frontier) — ni "arreglitos rápidos".
-- No lanzar subagentes en paralelo sobre el backlog (ficheros compartidos + regla
-  de una feature a la vez).
-- No ejecutar `verify` ni `code-review` por feature: ambos van agrupados al final.
-- No duplicar el protocolo del implementer en el prompt (vive en
-  `.claude/agents/implementer.md`); el prompt es la entrada JSON + contexto puntual.
-- No pasar AGENTS.md/CLAUDE.md/architecture.md enteros en el prompt del subagente:
-  el subagente lee ficheros concretos solo si la tarea los cita.
-- No saltarse los avisos de close.sh: exit 3 = corregir lo que indica y re-ejecutar.
-- No tocar `docs/IDEAS.md` jamás.
+- Do not implement code in the main chat (frontier) — not even "quick fixes".
+- Do not launch subagents in parallel over the backlog (shared files + one feature
+  at a time rule).
+- Do not run `verify` or `code-review` per feature: both are batched at the end.
+- Do not duplicate the implementer's protocol in the prompt (it lives in
+  `.claude/agents/implementer.md`); the prompt is the JSON entry + occasional context.
+- Do not pass whole AGENTS.md/CLAUDE.md/architecture.md files in the subagent's
+  prompt: the subagent reads concrete files only if the task cites them.
+- Do not skip close.sh's warnings: exit 3 = fix what it points out and re-run.
+- Never touch `docs/IDEAS.md`.

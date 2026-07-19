@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 """
-harness/check_docs.py - Chequeo determinista de documentacion.
+harness/check_docs.py - Deterministic documentation check.
 
-Detecta simbolos publicos anadidos/eliminados en el diff de la sesion
-(working tree + staged vs HEAD) en core/*.py y ui/common.py, y los cruza
-contra las menciones en harness/docs/architecture.md, harness/docs/data-models.md
-y CLAUDE.md, listando exactamente que falta o sobra. Un simbolo nuevo basta
-con que este mencionado en UNO de los docs (el detalle vive en architecture.md
-o data-models.md; CLAUDE.md se mantiene minimo); un simbolo eliminado no debe
-seguir mencionado en NINGUNO.
+Detects public symbols added/removed in the session diff (working tree +
+staged vs HEAD) in core/*.py and ui/common.py, and cross-checks them against
+the mentions in harness/docs/architecture.md, harness/docs/data-models.md and
+CLAUDE.md, listing exactly what is missing or leftover. A new symbol only
+needs to be mentioned in ONE of the docs (the detail lives in architecture.md
+or data-models.md; CLAUDE.md stays minimal); a removed symbol must not remain
+mentioned in ANY.
 
-Ademas, cruza la lista real de modulos del proyecto (core/*.py, ui/*.py,
-ui/pages/*.py) contra README.md: cada modulo debe aparecer por nombre en la
-seccion Estructura. Este cruce corre siempre que se invoca el script (no
-depende del diff), para que el drift acumulado salga a la luz en la primera
-sesion que toque codigo.
+It also cross-checks the real list of project modules (core/*.py, ui/*.py,
+ui/pages/*.py) against README.md: each module must appear by name in the
+Structure section. This cross-check runs every time the script is invoked (it
+does not depend on the diff), so accumulated drift surfaces in the first
+session that touches code.
 
-Es un check informativo: nunca debe lanzar una excepcion no controlada ni
-bloquear close.sh por un fallo inesperado de git/IO (exit 0 en ese caso).
+It is an informative check: it must never raise an uncontrolled exception nor
+block close.sh due to an unexpected git/IO failure (exit 0 in that case).
 """
 
 from __future__ import annotations
@@ -47,199 +47,198 @@ DOCS = (
 )
 
 
-def simbolos_publicos(source: str) -> set[str]:
-    """Simbolos publicos a nivel de modulo: def/async def, class y
-    asignaciones a NOMBRE_EN_MAYUSCULAS (incluye AnnAssign). Excluye
-    cualquier nombre que empiece por '_'. Devuelve set() si el source no
-    parsea (SyntaxError)."""
+def public_symbols(source: str) -> set[str]:
+    """Module-level public symbols: def/async def, class and assignments to
+    UPPER_CASE_NAMES (AnnAssign included). Excludes any name starting with
+    '_'. Returns set() if the source does not parse (SyntaxError)."""
     try:
         tree = ast.parse(source)
     except SyntaxError:
         return set()
 
-    simbolos: set[str] = set()
+    symbols: set[str] = set()
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             if not node.name.startswith("_"):
-                simbolos.add(node.name)
+                symbols.add(node.name)
         elif isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name) and not target.id.startswith("_"):
                     if target.id.isupper():
-                        simbolos.add(target.id)
+                        symbols.add(target.id)
         elif isinstance(node, ast.AnnAssign):
             target = node.target
             if isinstance(target, ast.Name) and not target.id.startswith("_"):
                 if target.id.isupper():
-                    simbolos.add(target.id)
+                    symbols.add(target.id)
 
-    return simbolos
-
-
-def menciona(doc_text: str, simbolo: str) -> bool:
-    """True si doc_text menciona simbolo como palabra completa (\\b + re.escape)."""
-    patron = r"\b" + re.escape(simbolo) + r"\b"
-    return re.search(patron, doc_text) is not None
+    return symbols
 
 
-def modulos_del_proyecto() -> list[str]:
-    """Rutas relativas (con /) de los modulos que README.md debe mencionar:
-    core/*.py, ui/*.py y ui/pages/*.py, excluyendo privados (_*) y __init__."""
-    rutas: list[str] = []
-    for patron in ("core/*.py", "ui/*.py", "ui/pages/*.py"):
-        for p in sorted(ROOT.glob(patron)):
+def mentions(doc_text: str, symbol: str) -> bool:
+    """True if doc_text mentions symbol as a whole word (\\b + re.escape)."""
+    pattern = r"\b" + re.escape(symbol) + r"\b"
+    return re.search(pattern, doc_text) is not None
+
+
+def project_modules() -> list[str]:
+    """Relative paths (with /) of the modules README.md must mention:
+    core/*.py, ui/*.py and ui/pages/*.py, excluding private (_*) and __init__."""
+    paths: list[str] = []
+    for pattern in ("core/*.py", "ui/*.py", "ui/pages/*.py"):
+        for p in sorted(ROOT.glob(pattern)):
             if p.name.startswith("_"):
                 continue
-            rutas.append(p.relative_to(ROOT).as_posix())
-    return rutas
+            paths.append(p.relative_to(ROOT).as_posix())
+    return paths
 
 
-def modulos_sin_mencion_en_readme() -> list[str]:
-    """Modulos del proyecto cuyo nombre de fichero no aparece en README.md."""
+def modules_missing_from_readme() -> list[str]:
+    """Project modules whose file name does not appear in README.md."""
     if not README_MD.exists():
         return []
-    texto = README_MD.read_text(encoding="utf-8")
+    text = README_MD.read_text(encoding="utf-8")
     return [
-        ruta
-        for ruta in modulos_del_proyecto()
-        if not menciona(texto, ruta.rsplit("/", 1)[-1])
+        path
+        for path in project_modules()
+        if not mentions(text, path.rsplit("/", 1)[-1])
     ]
 
 
-def diff_simbolos(old_source: str, new_source: str) -> tuple[set[str], set[str]]:
-    """Devuelve (anadidos, eliminados) entre old_source y new_source."""
-    antes = simbolos_publicos(old_source)
-    despues = simbolos_publicos(new_source)
-    anadidos = despues - antes
-    eliminados = antes - despues
-    return anadidos, eliminados
+def diff_symbols(old_source: str, new_source: str) -> tuple[set[str], set[str]]:
+    """Returns (added, removed) between old_source and new_source."""
+    before = public_symbols(old_source)
+    after = public_symbols(new_source)
+    added = after - before
+    removed = before - after
+    return added, removed
 
 
-def ficheros_cambiados() -> list[tuple[str, str]]:
-    """Parsea `git status --porcelain -- core ui` y devuelve (status, ruta)
-    solo para .py bajo core/ o exactamente ui/common.py."""
-    resultado = subprocess.run(
+def changed_files() -> list[tuple[str, str]]:
+    """Parses `git status --porcelain -- core ui` and returns (status, path)
+    only for .py under core/ or exactly ui/common.py."""
+    result = subprocess.run(
         ["git", "status", "--porcelain", "--", "core", "ui"],
         cwd=ROOT,
         capture_output=True,
         encoding="utf-8",
     )
-    if resultado.returncode != 0:
-        raise RuntimeError(f"git status fallo: {resultado.stderr.strip()}")
+    if result.returncode != 0:
+        raise RuntimeError(f"git status failed: {result.stderr.strip()}")
 
-    cambiados: list[tuple[str, str]] = []
-    for linea in resultado.stdout.splitlines():
-        if not linea.strip():
+    changed: list[tuple[str, str]] = []
+    for line in result.stdout.splitlines():
+        if not line.strip():
             continue
-        status = linea[:2]
-        resto = linea[3:]
+        status = line[:2]
+        rest = line[3:]
 
         if status.startswith("R"):
-            # Formato: "old -> new"
-            if " -> " in resto:
-                ruta = resto.split(" -> ", 1)[1].strip()
+            # Format: "old -> new"
+            if " -> " in rest:
+                path = rest.split(" -> ", 1)[1].strip()
             else:
-                ruta = resto.strip()
+                path = rest.strip()
         else:
-            ruta = resto.strip()
+            path = rest.strip()
 
-        # Quita comillas si git citó la ruta (paths con espacios/unicode)
-        if ruta.startswith('"') and ruta.endswith('"'):
-            ruta = ruta[1:-1]
+        # Remove quotes if git quoted the path (paths with spaces/unicode)
+        if path.startswith('"') and path.endswith('"'):
+            path = path[1:-1]
 
-        es_core_py = ruta.startswith("core/") and ruta.endswith(".py")
-        es_ui_common = ruta == "ui/common.py"
-        if es_core_py or es_ui_common:
-            cambiados.append((status.strip(), ruta))
+        is_core_py = path.startswith("core/") and path.endswith(".py")
+        is_ui_common = path == "ui/common.py"
+        if is_core_py or is_ui_common:
+            changed.append((status.strip(), path))
 
-    return cambiados
+    return changed
 
 
-def contenido_head(ruta: str) -> str:
-    """Devuelve el contenido de ruta en HEAD; '' si falla (fichero nuevo)."""
-    resultado = subprocess.run(
-        ["git", "show", f"HEAD:{ruta}"],
+def head_content(path: str) -> str:
+    """Returns the content of path at HEAD; '' if it fails (new file)."""
+    result = subprocess.run(
+        ["git", "show", f"HEAD:{path}"],
         cwd=ROOT,
         capture_output=True,
         encoding="utf-8",
     )
-    if resultado.returncode != 0:
+    if result.returncode != 0:
         return ""
-    return resultado.stdout
+    return result.stdout
 
 
 def main() -> int:
     try:
-        hallazgos: list[str] = []
+        findings: list[str] = []
 
-        for ruta in modulos_sin_mencion_en_readme():
-            hallazgos.append(
-                f"{YELLOW}[WARN]{NC} README.md: modulo {ruta} sin mencion en la seccion Estructura"
+        for path in modules_missing_from_readme():
+            findings.append(
+                f"{YELLOW}[WARN]{NC} README.md: module {path} not mentioned in the Structure section"
             )
 
-        cambiados = ficheros_cambiados()
+        changed = changed_files()
 
-        if not cambiados and not hallazgos:
-            print(f"{GREEN}[OK]{NC} Sin cambios en core/ o ui/common.py - nada que cruzar; README.md cubre todos los modulos")
+        if not changed and not findings:
+            print(f"{GREEN}[OK]{NC} No changes in core/ or ui/common.py - nothing to cross-check; README.md covers all modules")
             return 0
 
-        anadidos_por_fichero: dict[str, set[str]] = {}
-        eliminados_por_fichero: dict[str, set[str]] = {}
+        added_by_file: dict[str, set[str]] = {}
+        removed_by_file: dict[str, set[str]] = {}
 
-        for status, ruta in cambiados:
-            old_source = contenido_head(ruta)
+        for status, path in changed:
+            old_source = head_content(path)
 
             if status == "D":
                 new_source = ""
             else:
-                ruta_absoluta = ROOT / ruta
-                if not ruta_absoluta.exists():
+                absolute_path = ROOT / path
+                if not absolute_path.exists():
                     continue
-                new_source = ruta_absoluta.read_text(encoding="utf-8")
+                new_source = absolute_path.read_text(encoding="utf-8")
 
-            anadidos, eliminados = diff_simbolos(old_source, new_source)
-            if anadidos:
-                anadidos_por_fichero[ruta] = anadidos
-            if eliminados:
-                eliminados_por_fichero[ruta] = eliminados
+            added, removed = diff_symbols(old_source, new_source)
+            if added:
+                added_by_file[path] = added
+            if removed:
+                removed_by_file[path] = removed
 
         docs = {}
-        for nombre, ruta_doc in DOCS:
-            if ruta_doc.exists():
-                docs[nombre] = ruta_doc.read_text(encoding="utf-8")
+        for name, doc_path in DOCS:
+            if doc_path.exists():
+                docs[name] = doc_path.read_text(encoding="utf-8")
             else:
-                docs[nombre] = ""
-                print(f"{YELLOW}[WARN]{NC} No se encontro {ruta_doc.relative_to(ROOT)}, se trata como vacio")
+                docs[name] = ""
+                print(f"{YELLOW}[WARN]{NC} {doc_path.relative_to(ROOT)} not found, treated as empty")
 
-        for ruta, simbolos in sorted(anadidos_por_fichero.items()):
-            for simbolo in sorted(simbolos):
-                if not any(menciona(texto, simbolo) for texto in docs.values()):
-                    hallazgos.append(
-                        f"{YELLOW}[WARN]{NC} {ruta}: simbolo nuevo '{simbolo}' sin mencion en ningun doc "
-                        f"(documentalo en architecture.md o, si es de esquema JSON, en data-models.md)"
+        for path, symbols in sorted(added_by_file.items()):
+            for symbol in sorted(symbols):
+                if not any(mentions(text, symbol) for text in docs.values()):
+                    findings.append(
+                        f"{YELLOW}[WARN]{NC} {path}: new symbol '{symbol}' not mentioned in any doc "
+                        f"(document it in architecture.md or, if it is data schema, in data-models.md)"
                     )
 
-        for ruta, simbolos in sorted(eliminados_por_fichero.items()):
-            for simbolo in sorted(simbolos):
-                for nombre_doc, texto in docs.items():
-                    if menciona(texto, simbolo):
-                        hallazgos.append(
-                            f"{YELLOW}[WARN]{NC} {ruta}: simbolo eliminado '{simbolo}' sigue mencionado en {nombre_doc}"
+        for path, symbols in sorted(removed_by_file.items()):
+            for symbol in sorted(symbols):
+                for doc_name, text in docs.items():
+                    if mentions(text, symbol):
+                        findings.append(
+                            f"{YELLOW}[WARN]{NC} {path}: removed symbol '{symbol}' still mentioned in {doc_name}"
                         )
 
-        if not hallazgos:
-            print(f"{GREEN}[OK]{NC} Simbolos publicos del diff alineados con architecture.md / data-models.md / CLAUDE.md; README.md cubre todos los modulos")
+        if not findings:
+            print(f"{GREEN}[OK]{NC} Public symbols of the diff aligned with architecture.md / data-models.md / CLAUDE.md; README.md covers all modules")
             return 0
 
-        for linea in hallazgos:
-            print(linea)
+        for line in findings:
+            print(line)
 
         print()
-        print(f"{RED}[FAIL]{NC} {len(hallazgos)} hallazgo(s) de documentacion pendientes de revisar.")
+        print(f"{RED}[FAIL]{NC} {len(findings)} documentation finding(s) pending review.")
         return 1
 
-    except Exception as e:  # noqa: BLE001 - check informativo, nunca debe romper close.sh
-        print(f"[INFO] check_docs no pudo completarse: {e}")
+    except Exception as e:  # noqa: BLE001 - informative check, must never break close.sh
+        print(f"[INFO] check_docs could not complete: {e}")
         return 0
 
 

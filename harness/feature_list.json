@@ -1,6 +1,6 @@
 {
-  "project": "<nombre-del-proyecto>",
-  "description": "<una línea que describa el proyecto>",
+  "project": "<project-name>",
+  "description": "<one line describing the project>",
   "rules": {
     "one_feature_at_a_time": true,
     "require_tests_to_close": true,

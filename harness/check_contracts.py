@@ -1,7 +1,7 @@
 """
-Verifica que todos los símbolos importados desde core/ existen realmente.
-Escanea ui/ (y scripts/) buscando imports de core y llama attr/import para confirmar.
-Salida: lista de OK/FAIL por símbolo. Exit code 1 si hay algún FAIL.
+Verifies that every symbol imported from core/ actually exists.
+Scans ui/ (and scripts/) for core imports and calls attr/import to confirm.
+Output: OK/FAIL list per symbol. Exit code 1 if there is any FAIL.
 """
 
 import ast
@@ -23,10 +23,10 @@ def fail(msg): print(f"{RED}[FAIL]{NC} {msg}")
 
 def collect_core_imports(path: Path) -> list[tuple[str, str, str]]:
     """
-    Devuelve lista de (archivo, modulo_core, simbolo) para cada import de core.*
-    Cubre:
+    Returns a list of (file, core_module, symbol) for each core.* import.
+    Covers:
       - from core.X import a, b, c   → (file, "core.X", "a"), ...
-      - from core import X           → (file, "core", "X")  — se verificará como módulo
+      - from core import X           → (file, "core", "X")  — verified as a module
       - import core.X as alias       → (file, "core.X", None)
     """
     results = []
@@ -55,7 +55,7 @@ def verify(file: str, module: str, symbol: str | None) -> bool:
     try:
         mod = importlib.import_module(module)
     except ModuleNotFoundError as e:
-        fail(f"{file}: no se puede importar '{module}' — {e}")
+        fail(f"{file}: cannot import '{module}' — {e}")
         return False
 
     if symbol is None:
@@ -63,14 +63,14 @@ def verify(file: str, module: str, symbol: str | None) -> bool:
         return True
 
     if not hasattr(mod, symbol):
-        # Puede ser un submódulo (ej: from core import quotes → core.quotes)
+        # It may be a submodule (e.g.: from core import quotes → core.quotes)
         try:
             importlib.import_module(f"{module}.{symbol}")
-            ok(f"{file}: {module}.{symbol} (submódulo)")
+            ok(f"{file}: {module}.{symbol} (submodule)")
             return True
         except ModuleNotFoundError:
             pass
-        fail(f"{file}: '{module}' no tiene '{symbol}'")
+        fail(f"{file}: '{module}' has no '{symbol}'")
         return False
 
     ok(f"{file}: {module}.{symbol}")
@@ -79,8 +79,8 @@ def verify(file: str, module: str, symbol: str | None) -> bool:
 
 def scan_module_dot_attr(path: Path) -> list[tuple[str, str, str]]:
     """
-    Detecta usos del patrón `alias.metodo(` donde alias fue importado
-    como `from core import alias`. Ejemplo: `quotes.precio_actual(`.
+    Detects uses of the `alias.method(` pattern where alias was imported
+    as `from core import alias`. Example: `quotes.current_price(`.
     """
     results = []
     try:
@@ -89,7 +89,7 @@ def scan_module_dot_attr(path: Path) -> list[tuple[str, str, str]]:
     except SyntaxError:
         return results
 
-    # Mapea alias → módulo core completo para imports tipo `from core import X`
+    # Maps alias → full core module for imports like `from core import X`
     alias_to_module: dict[str, str] = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
@@ -99,7 +99,7 @@ def scan_module_dot_attr(path: Path) -> list[tuple[str, str, str]]:
                     name = alias.asname or alias.name
                     alias_to_module[name] = f"core.{alias.name}"
 
-    # Busca llamadas tipo alias.attr(...)
+    # Looks for alias.attr(...) calls
     for node in ast.walk(tree):
         if isinstance(node, ast.Attribute):
             if isinstance(node.value, ast.Name):
@@ -127,10 +127,10 @@ def main() -> int:
             all_checks.extend(scan_module_dot_attr(py_file))
 
     if not all_checks:
-        print("No se encontraron imports de core/. Nada que verificar.")
+        print("No core/ imports found. Nothing to verify.")
         return 0
 
-    # Deduplicar
+    # Deduplicate
     seen = set()
     unique = []
     for item in all_checks:
@@ -146,9 +146,9 @@ def main() -> int:
 
     print()
     if failures:
-        print(f"{RED}FAIL {failures} contrato(s) roto(s). Revisa core/ antes de continuar.{NC}")
+        print(f"{RED}FAIL {failures} broken contract(s). Review core/ before continuing.{NC}")
     else:
-        print(f"{GREEN}OK Todos los contratos UI<->core verificados.{NC}")
+        print(f"{GREEN}OK All UI<->core contracts verified.{NC}")
 
     return 1 if failures else 0
 

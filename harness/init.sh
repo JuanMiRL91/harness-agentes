@@ -60,7 +60,6 @@ echo ""
 echo "▸ Harness files"
 REQUIRED_FILES=(
     "AGENTS.md"
-    "harness/CHECKPOINTS.md"
     "harness/feature_list.json"
     "harness/feature_list_archive.json"
     "harness/progress/current.md"
@@ -152,19 +151,12 @@ echo "▸ Tests"
 TEST_COUNT=$( (find tests/ -name "test_*.py" 2>/dev/null || true) | wc -l | tr -d ' ')
 if [ -d "tests" ] && [ "$TEST_COUNT" -gt 0 ]; then
     if "$PY" -m pytest --version &>/dev/null 2>&1; then
-        if "$PY" -m pytest tests/ -q --tb=short 2>&1; then
-            ok "All tests pass (pytest, alphabetical order)"
-            # A test file can leave contaminated shared state (mocks/modules in
-            # sys.modules) that only breaks ANOTHER file depending on execution
-            # order. Re-running in reverse alphabetical order is cheap (same
-            # runtime) and exposes exactly that class of leak without depending
-            # on a random-order plugin.
-            REVERSE_FILES=$(find tests/ -name "test_*.py" 2>/dev/null | sort -r)
-            if "$PY" -m pytest $REVERSE_FILES -q --tb=short 2>&1; then
-                ok "All tests pass (pytest, reverse order — isolation between files)"
-            else
-                fail "Tests fail in reverse order — there is shared state between test files"
-            fi
+        # -n auto (pytest-xdist) spreads files across workers in a varying order: faster, and it
+        # also exposes shared state between test files. Without xdist, a plain run.
+        XDIST=""
+        "$PY" -c "import xdist" 2>/dev/null && XDIST="-n auto"
+        if "$PY" -m pytest tests/ -q -rs --tb=short $XDIST 2>&1; then
+            ok "All tests pass (pytest ${XDIST:-without xdist})"
         else
             fail "There are failing tests — review before continuing"
         fi
@@ -203,6 +195,22 @@ if [ -f "harness/check_placeholder.py" ]; then
     fi
 else
     warn "harness/check_placeholder.py not found"
+fi
+
+# ── 8. Git hooks (pre-commit: check_comments.py --staged) ────────────────────
+# core.hooksPath is local config (it does not travel with the clone): set it here.
+echo ""
+echo "▸ Git hooks (harness/hooks)"
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    if [ "$(git config --get core.hooksPath || true)" != "harness/hooks" ]; then
+        git config core.hooksPath harness/hooks
+        ok "core.hooksPath set to harness/hooks"
+    else
+        ok "core.hooksPath already points to harness/hooks"
+    fi
+    [ -x "harness/hooks/pre-commit" ] || chmod +x harness/hooks/pre-commit 2>/dev/null || true
+else
+    warn "Not a git repository: hooks not registered"
 fi
 
 # ── Final result ─────────────────────────────────────────────────────────────

@@ -3,25 +3,25 @@
 # Run when a feature is marked as "done" in feature_list.json.
 # Usage: ./harness/close.sh  (from the project root)
 #
-# Steps:
-#   1. Verifies that init.sh passes 100%
-#   2. Reads the just-completed feature from progress/current.md
-#   3. Detects changes in core/ or ui/ and warns if neither harness/docs/architecture.md
-#      nor harness/docs/data-models.md were touched; also cross-checks the public
-#      symbols of the diff against the docs (harness/check_docs.py, deterministic)
-#   3b. If the commit is a fix (BUG_), reminds you of the systemic bug→check cycle
-#   3c. Warns if CLAUDE.md exceeds 40,000 characters (it must stay minimal;
-#      detail goes to architecture.md/data-models.md, changelog to history.md)
-#   3d. Archives done/Cancelled features into harness/feature_list_archive.json
-#      (the active file keeps only open tasks; global ids across both)
-#   4. Moves progress/current.md to the end of progress/history.md and resets it
-#   5. Makes the automatic commit with a conventional message
+# Steps (any check that can `exit` runs BEFORE the archiving in 3c):
+#   1. init.sh passes 100%
+#   2. Reads the completed task from progress/current.md (`#N` or `[N]` marker)
+#   2b. If the active backlog has `done` tasks, current.md must narrate them
+#       (harness/check_session_log.py)
+#   3a. Size gates: CLAUDE.md <= 15,000 chars, architecture.md <= 60,000 chars
+#   3b. Comment gate on the changed files (harness/check_comments.py --working)
+#   3c. Archives done/Cancelled tasks into harness/feature_list_archive.json
+#   4. Appends current.md to history.md, resets it and rotates history.md by size
+#   5. Automatic conventional commit
+#
+# Takes 1-2 min and is NOT reentrant: one run, in the foreground, nothing in parallel.
 #
 # Exit codes:
 #   0 = session closed (commit made, or nothing to commit)
-#   1 = error (init.sh red, or the feature in current.md is not "done")
-#   3 = paused: docs pending or CLAUDE.md >40k — fix and re-run close.sh
-#       (with non-interactive stdin, e.g. an agent, the pause is automatic)
+#   1 = error (init.sh red, or the task in current.md is not "done")
+#   3 = paused: session log missing, comments or a doc over its size limit — fix
+#       and re-run close.sh (with non-interactive stdin, e.g. an agent, the pause
+#       is automatic)
 
 set -euo pipefail
 
@@ -84,8 +84,8 @@ FEATURE_LINE=$(grep -m1 "Feature in progress" "$CURRENT" 2>/dev/null || true)
 FEATURE_ID=""
 FEATURE_NAME=""
 
-if echo "$FEATURE_LINE" | grep -qE "#[0-9]+"; then
-    FEATURE_ID=$(echo "$FEATURE_LINE" | grep -oE "#[0-9]+" | head -1 | tr -d '#')
+if echo "$FEATURE_LINE" | grep -qE "#[0-9]+|\[[0-9]+\]"; then
+    FEATURE_ID=$(echo "$FEATURE_LINE" | grep -oE "#[0-9]+|\[[0-9]+\]" | head -1 | tr -d '#[]')
     # Extract feature name from feature_list.json by id
     FEATURE_DATA=$("$PY" - <<PYEOF
 import json, os
@@ -124,8 +124,9 @@ else
     COMMIT_TYPE="chore"
     # No #id: use the "Feature in progress" text as the chore title (infrastructure
     # sessions without a backlog entry).
-    CHORE_TITLE=$(echo "$FEATURE_LINE" | sed -E 's/.*Feature in progress:\*{0,2}//; s/<!--.*-->//; s/^[[:space:]_]+//; s/[[:space:]_]+$//')
-    if [ -n "$CHORE_TITLE" ] && [ "$CHORE_TITLE" != "none" ]; then
+    # Drops the template's `_none_` placeholder even with text after it; inner `_` are kept.
+    CHORE_TITLE=$(echo "$FEATURE_LINE" | sed -E 's/.*Feature in progress:\*{0,2}//; s/<!--.*-->//; s/^[[:space:]]*[_*]+[nN]one[_*]+[[:space:]]*(—|–|-|:)?[[:space:]]*//; s/^[[:space:]_*]+//; s/[[:space:]_*]+$//')
+    if echo "$CHORE_TITLE" | grep -q '[[:alnum:]]'; then
         FEATURE_TITLE="$CHORE_TITLE"
         info "No feature id — committing as 'chore: ${CHORE_TITLE}'."
     else
@@ -136,94 +137,52 @@ else
 fi
 echo ""
 
-# ── 3. Do architecture.md / data-models.md need updating? ────────────────────
-echo "▸ Checking documentation (harness/docs/architecture.md / data-models.md)"
-
-# Modified code files (staged + unstaged)
-CHANGED_CODE=$(git status --porcelain -- core/ ui/ 2>/dev/null | wc -l | tr -d ' ')
-
-if [ "$CHANGED_CODE" -gt 0 ]; then
-    info "There are $CHANGED_CODE modified file(s) in core/ or ui/."
-
-    ARCH_CHANGED=$(git status --porcelain -- harness/docs/architecture.md 2>/dev/null | wc -l | tr -d ' ')
-    DM_CHANGED=$(git status --porcelain -- harness/docs/data-models.md 2>/dev/null | wc -l | tr -d ' ')
-    NEEDS_CONFIRM=0
-
-    if [ "$ARCH_CHANGED" -eq 0 ] && [ "$DM_CHANGED" -eq 0 ]; then
-        warn "Neither harness/docs/architecture.md nor data-models.md were modified — where is the change documented?"
-        warn "Modules/functions/decisions → architecture.md · data schemas → data-models.md ·"
-        warn "changelog → progress/current.md (this script archives it) · CLAUDE.md only if the one-line map changes."
-        NEEDS_CONFIRM=1
-    else
-        [ "$ARCH_CHANGED" -gt 0 ] && ok "harness/docs/architecture.md updated"
-        [ "$DM_CHANGED" -gt 0 ] && ok "harness/docs/data-models.md updated"
-    fi
-
-    # Deterministic cross-check: public symbols added/removed in the diff vs
-    # mentions in architecture.md / data-models.md / CLAUDE.md (exact list,
-    # not just "was the doc touched?") + coverage of all core/ and ui/ modules
-    # in the Structure section of README.md
-    if [ -f harness/check_docs.py ]; then
-        if ! "$PY" harness/check_docs.py; then
-            NEEDS_CONFIRM=1
-        fi
-    fi
-
-    if [ "$NEEDS_CONFIRM" -eq 1 ]; then
-        echo ""
-        if [ -t 0 ]; then
-            echo -e "${YELLOW}  Proceed anyway without updating the docs? [y/N]${NC} \c"
-            read -r ANSWER || ANSWER=""
-        else
-            ANSWER="N"
-            warn "non-interactive stdin — automatic pause (an agent cannot skip this warning)."
-        fi
-        if [[ ! "$ANSWER" =~ ^[yY]$ ]]; then
-            warn "Session paused (exit 3). Update the docs and re-run ./harness/close.sh"
-            exit 3
-        fi
-    fi
-else
-    ok "No changes in core/ or ui/ — docs need no update"
+# ── 2b. Session log required when there are done tasks ───────────────────────
+echo "▸ Session log (current.md vs done tasks)"
+if ! "$PY" harness/check_session_log.py; then
+    echo ""
+    warn "Session paused (exit 3). Write the log and re-run ./harness/close.sh"
+    exit 3
 fi
 echo ""
 
-# ── 3b. Closed bug → systemic harness improvement ────────────────────────────
-if [ "${COMMIT_TYPE:-}" = "fix" ]; then
-    echo "▸ Systemic cycle (bug → harness check)"
-    HARNESS_CHANGED=$(git status --porcelain -- harness/ .claude/ 2>/dev/null | wc -l | tr -d ' ')
-    if [ "$HARNESS_CHANGED" -eq 0 ]; then
-        warn "You are closing a BUG_ with no changes in harness/ or .claude/ — which check would have caught this bug earlier?"
-        warn "If a reasonable one exists, add it (improve-harness skill) before closing; if not applicable, note it in current.md ('Systemic check: not applicable — reason')."
-    else
-        ok "The fix includes changes in harness/ or .claude/ (systemic cycle addressed)"
+# ── 3a. Size gates (injected or read every session) ──────────────────────────
+size_gate() {  # file, limit, hint
+    local chars answer
+    chars=$("$PY" -c "print(len(open('$1', encoding='utf-8').read()))" 2>/dev/null || echo 0)
+    if [ "$chars" -le "$2" ]; then
+        ok "$1 within the limit ($chars / $2 characters)"
+        return
     fi
-    echo ""
-fi
-
-# ── 3c. CLAUDE.md must stay minimal (≤40,000 characters) ─────────────────────
-echo "▸ CLAUDE.md size"
-CLAUDE_CHARS=$("$PY" -c "print(len(open('CLAUDE.md', encoding='utf-8').read()))" 2>/dev/null || echo 0)
-if [ "$CLAUDE_CHARS" -gt 40000 ]; then
-    warn "CLAUDE.md has $CLAUDE_CHARS characters (limit: 40000) — it is injected whole into every session."
-    warn "Move the detail to harness/docs/architecture.md or data-models.md; the changelog goes to progress/history.md."
+    warn "$1 has $chars characters (limit: $2). $3"
     if [ -t 0 ]; then
-        echo -e "${YELLOW}  Proceed anyway with CLAUDE.md over the limit? [y/N]${NC} \c"
-        read -r ANSWER_CLAUDE || ANSWER_CLAUDE=""
+        echo -e "${YELLOW}  Proceed anyway with $1 over the limit? [y/N]${NC} \c"
+        read -r answer || answer=""
     else
-        ANSWER_CLAUDE="N"
+        answer="N"
         warn "non-interactive stdin — automatic pause (an agent cannot skip this warning)."
     fi
-    if [[ ! "$ANSWER_CLAUDE" =~ ^[yY]$ ]]; then
-        warn "Session paused (exit 3). Reduce CLAUDE.md and re-run ./harness/close.sh"
+    if [[ ! "$answer" =~ ^[yY]$ ]]; then
+        warn "Session paused (exit 3). Trim $1 and re-run ./harness/close.sh"
         exit 3
     fi
-else
-    ok "CLAUDE.md within the limit ($CLAUDE_CHARS / 40000 characters)"
+}
+echo "▸ Doc sizes"
+size_gate CLAUDE.md 15000 "It is injected whole into every session: decisions, paths and rules only."
+size_gate harness/docs/architecture.md 60000 "Keep decisions, invariants and verified findings; delete what the code already says."
+echo ""
+
+# ── 3b. Comment gate (same rule as the pre-commit hook) ──────────────────────
+# Checked here, before archiving: if the hook rejected the commit of §5, current.md and
+# the done tasks would already be archived.
+echo "▸ Comments in the changed files"
+if ! "$PY" harness/check_comments.py --working; then
+    warn "Session paused (exit 3). Trim the flagged comments and re-run ./harness/close.sh"
+    exit 3
 fi
 echo ""
 
-# ── 3d. Archive closed features ──────────────────────────────────────────────
+# ── 3c. Archive closed features ──────────────────────────────────────────────
 echo "▸ Archiving closed features (done/Cancelled → feature_list_archive.json)"
 ARCHIVED_N=$("$PY" - <<'PYEOF'
 import json
@@ -272,9 +231,11 @@ echo "▸ Updating progress/"
 IS_TEMPLATE=$("$PY" -c "
 import re, sys
 content = open('$CURRENT', encoding='utf-8').read()
-# Empty template = has the no-feature line and no real content in the Log
-empty = ('_none_' in content) and ('- ...' in content)
-print('1' if empty else '0')
+# Same per-line rule as check_session_log.is_template(): placeholder line AND empty log bullet.
+lines = content.splitlines()
+placeholder = any(l.startswith('- **Feature in progress:**') and '_none_' in l for l in lines)
+empty_log = any(l.strip() == '- ...' for l in lines)
+print('1' if (placeholder and empty_log) else '0')
 ")
 
 if [ "$IS_TEMPLATE" = "0" ]; then
@@ -299,9 +260,16 @@ if feat_line_m:
         name_part = re.sub(r'^Feature\s+', '', name_part, flags=re.IGNORECASE).strip()
         if name_part:
             header = '## ' + date_str + ' — #' + fid + ' ' + name_part
+    if not header:
+        own = re.sub(r'^[\\s]*[_*]+[nN]one[_*]+[\\s]*[—–:-]?\\s*', '', val).strip(' _*')
+        if re.search(r'[^\\W_]', own):
+            header = '## ' + date_str + ' — ' + own
 if not header:
     header = '## ' + date_str + ' — Session closed'
-content = re.sub(r'^# Current session.*', header, content, count=1, flags=re.MULTILINE)
+# Without the template H1 the entry would end up glued to the previous one: prepend the header.
+content, n_sub = re.subn(r'^# Current session.*', header, content, count=1, flags=re.MULTILINE)
+if not n_sub:
+    content = header + '\\n\\n' + content.lstrip()
 sys.stdout.write(content)
 ")
     {
@@ -315,29 +283,19 @@ else
     info "current.md is empty (template), not appended to history.md"
 fi
 
+"$PY" harness/rotate_history.py || warn "rotate_history.py failed (does not block the close)"
+
 cat > "$CURRENT" << 'TEMPLATE'
 # Current session
 
-> This file is emptied when each session closes and moved to `history.md`.
-> While you work, **keep it updated in real time**, not at the end.
+> Emptied on close and moved to `history.md`. Brief: what, decisions, blockers.
 
 - **Feature in progress:** _none_  <!-- format: #N feature_name -->
 - **Start:** _—_
-- **Agent:** _—_
-
-## Plan
-
-_Describe in 3-5 bullets what you are going to do before touching code._
 
 ## Log
 
-_Note here every significant step: files created, decisions, blockers._
-
 - ...
-
-## Next step
-
-_If the session is interrupted, the first thing the next session must do._
 
 ---
 TEMPLATE

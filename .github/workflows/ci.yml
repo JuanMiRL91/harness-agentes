@@ -1,0 +1,27 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          pip install pytest pytest-xdist
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      # init.sh is the single source of truth: tests and harness checks.
+      - run: ./harness/init.sh
+      - name: check_comments on the changed files
+        run: |
+          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+          case "$BASE" in ""|0000000*) BASE="$(git rev-list --max-parents=0 HEAD | tail -1)";; esac
+          FILES=$(git diff --name-only --diff-filter=d "$BASE" HEAD)
+          [ -z "$FILES" ] || python3 harness/check_comments.py $FILES

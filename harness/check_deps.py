@@ -80,7 +80,7 @@ def _stdlib_names():
 
 def _local_packages():
     # "harness" is not in SCAN_DIRS (not scanned) but it IS a local package:
-    # tests import harness.check_docs and it must not end up in requirements.txt
+    # tests may import harness.* and it must not end up in requirements.txt
     local = set(SCAN_DIRS) | {"harness"}
     for f in ROOT.glob("*.py"):
         local.add(f.stem)

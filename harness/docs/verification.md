@@ -1,67 +1,32 @@
 # Verification — how to know your work functions
 
-## Before declaring a feature `done`
+## Before marking a task `done`
 
-1. **Run `./harness/init.sh`** — it must finish without errors (`[OK]` on every check,
-   including the **UI↔core contracts** check).
-2. **Green tests:** all tests of the affected module pass.
-   ```bash
-   python -m pytest tests/ -v
-   ```
-3. **E2E verification of the UI (`verify` skill):** if the task's `description` says
-   `E2E verification: yes` (or, if it says nothing, when the change touches `core/` or
-   `ui/`), run the `verify` skill (`.claude/skills/verify/SKILL.md`): it starts the
-   real app, walks the affected pages interacting with the changed flow, and checks
-   that there are no new errors in the app log or the terminal. Tests do not replace
-   this step. It runs **only here** (once, right before `close.sh`) or when the user
-   explicitly asks to verify — never at session start or in `init.sh`. If the task
-   says `E2E verification: no`, skip this step.
-4. **`acceptance` criteria one by one:** each criterion of the task in
-   `harness/feature_list.json` states its verification method (test command or `UI:`
-   step); verify them all before marking `done`.
-5. **No residue:** no debug `print()`, context-less TODOs, or temporary files.
+1. Tests of what you touched green (`python -m pytest tests/test_<x>.py -q`), with the
+   regression test if it was a bug.
+2. Every `acceptance` criterion checked with the method it states.
+3. No residue: no debug `print()`, context-less TODOs or temporary files.
+4. `./harness/close.sh` runs the full suite (`init.sh`) before the commit.
 
-## Tests per layer
+## E2E verification (`verify` skill) — always opt-in
 
-### core/
-- `python -m pytest tests/test_<module>.py -v`
-- For modules with I/O, use real temporary directories.
-- For external API clients, mock the HTTP calls with `unittest.mock`.
+Starts the real app and walks the pages with a browser. It is expensive: only when the
+user asks in the session ("verify the app", "/verify"), never on close or in `init.sh`.
+A task's `E2E verification: yes/no` line is intent, not a trigger.
 
-### UI
-- Start the app with its entry command (documented in `conventions.md`).
-- Verify that the main pages load without exceptions in the terminal.
+## Review — opt-in
 
-## Harness integrity checks
+`/code-review` is typed by the user. The model may launch a fresh-context reviewer
+subagent over the diff of a non-trivial task or batch (see `orchestrate-backlog`).
 
-`./harness/init.sh` automatically verifies:
-- Python 3.9+ installed.
-- Mandatory files present (`AGENTS.md`, `harness/feature_list.json`,
-  `harness/feature_list_archive.json`, `harness/progress/current.md`, `harness/docs/`).
-- Only one feature in `in_progress` state at a time; the archive of closed tasks only
-  contains `done`/`Cancelled` and there are no ids duplicated between active and archive.
-- Tests executed correctly (in alphabetical order and in reverse order, to detect
-  shared state between test files).
-- **UI↔core contracts** (`harness/check_contracts.py`): every symbol `ui/` imports
-  from `core/` actually exists. Catches runtime `AttributeError` and `ImportError`
-  before the app starts. If this check fails, the app **will not start**.
-- **Placeholder text** (`harness/check_placeholder.py`): no string literal in
-  `core/`/`ui/` contains filler text from the blacklist.
+## What `init.sh` verifies
 
-## Session close
+- Python ≥ 3.9, harness files, coherent `feature_list.json` (a single `in_progress`,
+  archive only `done`/`Cancelled`, unique ids) and dependencies (`check_deps.py`).
+- Full pytest in parallel (`-n auto` if pytest-xdist is installed): the varying split
+  across workers exposes shared state between files.
+- UI↔core contracts (`check_contracts.py`) and placeholder text (`check_placeholder.py`).
+- `pre-commit` hook (`check_comments.py --staged`) registered.
 
-When the feature is `done`, run:
-```bash
-./harness/close.sh
-```
-The script verifies `init.sh`, detects whether `CLAUDE.md`/`README.md`/
-`harness/docs/architecture.md` need updating — binary checks plus the deterministic
-cross-check of `harness/check_docs.py`, which lists the public symbols of the diff
-that are missing/leftover in the docs and the `core/`/`ui/` modules with no mention in
-the README's Structure section —, and if the commit is a `fix` it reminds you of the
-**systemic cycle**: which harness check would have caught the bug (add it with the
-`improve-harness` skill, or note in `current.md` why it does not apply). Then it moves
-`current.md` to `history.md`, resets it and makes the automatic commit.
-
-Before `close.sh`, run `/code-review` over the session diff (fresh-context review) and
-apply or reasonedly discard its findings (see `AGENTS.md` §5).
+CI (`.github/workflows/ci.yml`) runs this same `init.sh` plus `check_comments.py` over the
+pushed diff.

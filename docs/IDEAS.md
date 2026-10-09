@@ -9,7 +9,7 @@
 > nothing written here is actionable.
 >
 > Format: one idea per block, separated by `---`, each with a `##` title and a free
-> description (this is what the Ideas tab of `harness/viewer.py` renders).
+> description.
 
 ---
 

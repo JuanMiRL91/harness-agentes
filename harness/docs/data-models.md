@@ -2,8 +2,7 @@
 
 > **Template** — complete schema of ALL the project's data files (JSON, YAML, CSV…).
 > Every schema change (new, renamed or removed key, or changed semantics) is
-> documented here **in the same session** that introduces it; `harness/check_docs.py`
-> and `close.sh` verify it.
+> documented here **in the same session** that introduces it.
 
 ## Conventions
 

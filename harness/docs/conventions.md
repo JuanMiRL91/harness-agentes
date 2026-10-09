@@ -17,8 +17,20 @@
 ## Comments
 
 By default **no** comments are written. They are only allowed when they explain the
-**why** (a non-obvious constraint, a subtle invariant, a workaround with a reason).
-Clear names communicate the what.
+**why** (a non-obvious constraint, a subtle invariant, a workaround with a reason). Clear
+names communicate the what.
+
+Enforced by `harness/check_comments.py` (`pre-commit` hook in `harness/hooks/`, registered
+by `init.sh`; and `close.sh` §3b) on the **changed** files (`.py` under
+`core/ui/harness/tests/scripts`, `.ts/.tsx/.js/.jsx` under `ui/`):
+
+- **Length:** no comment block exceeds **2 lines**.
+- **Density:** in a file with ≥15 lines of code, at most **1 comment line per 5 of code**.
+- **Module/class docstrings:** in a `.py` of ≥20 lines they stay under **30% of the
+  file**. Function docstrings are excluded: they are the public contract. Design
+  decisions go to `harness/docs/architecture.md`.
+- Pragmas (`# noqa`, `# type:`…) do not count. Legacy code blocks nothing until touched.
+  Skip once: `git commit --no-verify`.
 
 ## `core/` modules
 
@@ -35,38 +47,36 @@ Clear names communicate the what.
 ## Tests (`tests/`)
 
 - One test file per `core/` module: `tests/test_<module>.py`.
-- Use `unittest.TestCase` with descriptive names.
-- I/O tests use real temporary directories (no filesystem mocks).
-- Run with: `python -m pytest tests/` or `python -m unittest discover tests/`.
+- I/O tests use real temporary directories (`tmp_path`), never real user data. Network
+  always mocked.
+- A fixed bug leaves a regression test that fails without the fix.
+- Full suite: `python -m pytest tests/ -q -n auto` (pytest-xdist); during a task, the
+  affected files are enough.
 
 ## Harness (`harness/`)
 
-- `init.sh` and `close.sh` run from the project root: `./harness/init.sh`.
-- `check_*.py` and `viewer.py` are development tools, not production code.
-- Harness scripts do not depend on the UI framework and must run in a clean shell
-  (exception: `viewer.py`, which uses Streamlit).
+- `init.sh`/`close.sh` run from the root. `close.sh` takes 1-2 min and is not reentrant:
+  one run, in the foreground (`timeout: 600000`), nothing in parallel.
+- Closing a task requires `- **Feature in progress:** #N name` and a brief log in
+  `harness/progress/current.md` (`check_session_log.py`); the `feat(#N)`/`fix(#N)` commit
+  and the `history.md` entry come from there.
+- Checks that can `exit` run before the task archiving in `close.sh`.
+- A new check is added only for a **class** of bug that repeats or that a test cannot
+  cover; a one-off bug is covered by its regression test.
+- Harness scripts are stdlib-only, print ASCII (Windows cp1252) and use `"$PY"`, never
+  `python3` directly.
 
 ## Documentation
 
-Every feature/bug that changes `core/`, `ui/` or the harness leaves the documentation
-aligned **in the same session**, before `./harness/close.sh` (which verifies it). Each
-thing goes to its document, **without duplication**:
+Each thing in its place, without duplication and only what the code does not say:
 
-- `harness/docs/architecture.md` — the source of fine detail: new/renamed/removed
-  public functions, design decisions, findings verified live.
-- `harness/docs/data-models.md` — any schema change in a data file (new, renamed or
-  removed key, or changed semantics).
-- `harness/progress/current.md` — the session's narrative changelog (`close.sh`
-  archives it into `history.md`). Never write changelog in `CLAUDE.md` or
-  architecture.md.
-- `CLAUDE.md` — ONLY if the one-line map changes (new/renamed/removed module or page)
-  or an architecture decision. It stays below 40,000 characters (`close.sh` warns if
-  exceeded).
-- `README.md` — high-level picture; update only if the change affects what it describes.
-- `harness/docs/conventions.md` / `verification.md` — only if a convention or the
-  verification method changes.
+- `harness/docs/architecture.md` — decisions, invariants and verified findings (external
+  APIs, non-obvious behaviors). Not a function index: the code and its docstrings are.
+  ≤ 60,000 characters (`close.sh`).
+- `harness/docs/data-models.md` — every schema change of a data file.
+- `harness/progress/current.md` — the session changelog (`close.sh` archives it).
+- `CLAUDE.md` — decisions, paths and rules only; < 15,000 characters (`close.sh`).
+- `README.md` — high-level vision and the user's way of working.
 
-Documentation describes **what is implemented**, never future plans: actionable work
-goes to `harness/feature_list.json` (skills `/add-feature`, `/add-bug`); unripe ideas
-go to `docs/IDEAS.md`, a **personal document of the user** that no agent edits (it is
-only read when the user asks to convert ideas into features).
+Never future plans in the docs: actionable work goes to `harness/feature_list.json`
+(`/add-feature`, `/add-bug`); ideas to `docs/IDEAS.md`, which no agent edits.

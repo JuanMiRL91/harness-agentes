@@ -1,6 +1,6 @@
 ---
 name: verify
-description: E2E verification of the app after a change in core/ or ui/ — starts the real app, walks the affected pages with the browser, and quantitatively checks that there are no new exceptions in the app log or the terminal. Run ONLY as the last step before ./harness/close.sh (if the task requires it) or when the user explicitly asks to verify — NEVER in init.sh or at session start. Tests and check_contracts.py do NOT replace this step.
+description: E2E verification of the app after a change in core/ or ui/ — starts the real app, walks the affected pages with the browser, and quantitatively checks that there are no new exceptions in the app log or the terminal. Run ONLY when the user explicitly asks for it in the session — NEVER by default when closing a task, in init.sh or at session start. Tests and check_contracts.py do NOT replace this step (some bugs only show up using the app), but the token cost is high, so it is always opt-in.
 ---
 
 # Verifying the app end to end
@@ -17,24 +17,14 @@ impression.
 
 ## When it runs (and when NOT)
 
-There are only **two** valid triggers:
+**Only on explicit user request** ("verify the app", "run /verify", "check the UI end to
+end"). A generic mention of "checking" or "reviewing" the code does NOT count. The
+`E2E verification: yes/no` line of a task is intent (which pages to walk), not a trigger:
+when a task with `UI:` criteria closes, say so in one line and let the user decide.
 
-1. **Session close:** as the last step before `./harness/close.sh`, when the task is
-   completed and its `description` in `harness/feature_list.json` states
-   `E2E verification: yes` (or has `UI:` criteria in `acceptance`).
-2. **Direct user invocation:** only if they ask to verify explicitly and
-   unambiguously ("verify the app", "run /verify", "check the UI end to end").
-   A generic mention of "checking" or "reviewing" the code does NOT count.
-
-**NEVER** run it at session start, inside `./harness/init.sh`, or as prior
-exploration: it is the most token-expensive skill in the harness and its value lies
-in verifying the change ALREADY made, not the starting state.
-
-It does not apply to changes that only touch `harness/`, `tests/` or docs (there
-`./harness/init.sh` is enough), nor to tasks whose `description` says
-`E2E verification: no` (small changes with no new UI flow). If the task touches
-`core/` or `ui/` and its `description` says nothing, apply the default criterion:
-run it.
+**NEVER** run it at session start, inside `./harness/init.sh`, by default before
+`close.sh`, or as prior exploration: it is the most token-expensive skill in the harness.
+In a batch (`orchestrate-backlog`), one pass over the union of deferred `UI:` criteria.
 
 ## Choosing the browser (in this order)
 
